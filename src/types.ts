@@ -16,6 +16,15 @@ export interface GoalParticipant {
   photoUrl?: string;
   joinedAt: string;
   entries: Record<string, GoalEntry>;
+  /** «Поддержать»: total received, received in the last ~20 hours, and whether the current user already cheered. */
+  cheers?: { total: number; recent: number; byMe: boolean };
+}
+
+export interface ReminderSettings {
+  /** The server can send VK notifications (it has a service key). */
+  available: boolean;
+  notifications: boolean;
+  tzOffset: number;
 }
 
 export interface Goal {

@@ -13,3 +13,5 @@ Dockerfile
 docker-compose.yml
 deploy
 README.md
+backups
+tests

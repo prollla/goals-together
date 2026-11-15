@@ -380,8 +380,54 @@ button:focus-visible {
 }
 
 .today-result {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 8px;
+  color: var(--goal-accent);
+  font-weight: 600;
+}
+
+.goal-card__completed,
+.goal-card__day-off {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.goal-card__completed {
+  color: var(--success-strong);
+  background: var(--success-bg);
+}
+
+.goal-card__day-off {
+  color: var(--vkui--color_text_secondary);
+  background: var(--vkui--color_background_secondary);
+  font-weight: 500;
+}
+
+.goal-card--completed .goal-card__icon {
+  filter: saturate(0.7);
+}
+
+.goal-card__yesterday {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 0 0;
+  border: 0;
+  color: var(--vkui--color_text_secondary);
+  background: transparent;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.goal-card__yesterday strong {
   color: var(--goal-accent);
   font-weight: 600;
 }
@@ -686,6 +732,38 @@ button:focus-visible {
   border-radius: 50%;
 }
 
+.calendar-day--off {
+  opacity: 0.35;
+}
+
+button.calendar-day {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.calendar-day--tappable {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 55%, transparent);
+}
+
+.calendar-day--today strong {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.calendar-hint {
+  display: block;
+  margin-top: 8px;
+  color: var(--vkui--color_text_secondary);
+}
+
+.goal-manage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legend-dot--off { background: var(--vkui--color_background_secondary); box-shadow: inset 0 0 0 1px var(--vkui--color_separator_primary); }
 .legend-dot--done { background: #55b894; }
 .legend-dot--skipped { background: #b3b6bf; }
 
@@ -1052,6 +1130,12 @@ button:focus-visible {
   gap: 8px;
 }
 
+/* Status and summary share a line when there is room and wrap (instead of truncating) next to the cheer button. */
+.member-row__bottom {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
 .member-row__name {
   overflow: hidden;
   font-size: 15px;
@@ -1082,12 +1166,84 @@ button:focus-visible {
 }
 
 .member-row__summary {
-  overflow: hidden;
   color: var(--vkui--color_text_secondary);
   font-size: 13px;
-  text-align: right;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.reminders-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--vkui--color_separator_primary);
+  border-radius: 18px;
+  background: var(--vkui--color_background_content);
+}
+
+.reminders-card__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.reminders-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.reminders-card__body strong {
+  font-size: 15px;
+}
+
+.reminders-card__body small {
+  color: var(--vkui--color_text_secondary);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.member-row__cheered {
+  color: var(--goal-accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cheer-button {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 76px;
+  margin-top: 2px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--goal-accent) 35%, transparent);
+  border-radius: 12px;
+  color: var(--goal-accent);
+  background: color-mix(in srgb, var(--goal-accent) 8%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cheer-button__icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.cheer-button--sent {
+  border-color: transparent;
+  color: var(--vkui--color_text_secondary);
+  background: var(--vkui--color_background_secondary);
+  cursor: default;
 }
 
 .shared-goal__invite-hint {

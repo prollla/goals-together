@@ -5,3 +5,4 @@ export { CreateGoal } from './CreateGoal';
 export { GoalDetails } from './GoalDetails';
 export { Group } from './Group';
 export { JoinGoal } from './JoinGoal';
+export { EditGoal } from './EditGoal';

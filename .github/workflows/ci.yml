@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 — the same major version as the production Docker image (better-sqlite3 has prebuilt binaries for it).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type check and build
+        run: npm run build
+      - name: Goal logic tests
+        run: npm run test:logic
+      - name: API tests
+        run: npm run test:api
+      - name: Cheers, VK notifications and backups tests
+        run: npm run test:social

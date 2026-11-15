@@ -2,7 +2,7 @@ import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import { Avatar, Button, Div, Group as VKGroup, Header, IconButton, Panel, PanelHeader, Progress } from '@vkontakte/vkui';
 import { Icon20Check, Icon24ShareOutline, Icon28AddOutline, Icon28ShareOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { Goal, GoalParticipant, NavIdProps } from '../types';
-import { formatNumber, getCurrentValue, getDoneDays, getProgress, isDone, plural, toDateKey } from '../utils/goals';
+import { formatNumber, formatStreakUnit, getCurrentValue, getDoneDays, getProgress, getStreak, isDone, plural, toDateKey } from '../utils/goals';
 import { createGoalInviteLink } from '../utils/invite';
 import { getApiUserId } from '../api';
 import { GoalTypeIcon } from '../components/GoalTypeIcon';
@@ -13,10 +13,11 @@ interface GroupProps extends NavIdProps {
   onCreateGoal: () => void;
   serverError: string;
   onNotice: (message: string) => void;
+  onCheer: (goalId: string, userId: string) => void;
 }
 
 // Own class names on every text node: VKUI 8 typography classes are internal (vkuiTitle__level1 …) and not stable.
-export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNotice: setNotice }: GroupProps) => {
+export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNotice: setNotice, onCheer }: GroupProps) => {
   const sharedGoals = goals.filter((goal) => goal.privacy === 'group');
   const currentUserId = getApiUserId(fetchedUser);
   const today = toDateKey();
@@ -103,16 +104,20 @@ export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNot
                     {participants.map((participant) => {
                       const isMe = participant.userId === currentUserId;
                       const done = isDone(participant.entries[today]);
-                      const progress = getProgress({ ...goal, entries: participant.entries });
+                      const participantGoal = { ...goal, entries: participant.entries };
+                      const progress = getProgress(participantGoal);
+                      const streak = getStreak(participantGoal);
                       return (
                         <li className="member-row" key={participant.userId}>
                           <Avatar size={40} src={participant.photoUrl} initials={(isMe ? 'Вы' : participant.firstName).slice(0, 1)} gradientColor="blue" />
                           <div className="member-row__body">
                             <div className="member-row__top">
                               <span className="member-row__name">{isMe ? 'Вы' : participant.firstName}</span>
-                              <span className="member-row__percent">{progress}%</span>
+                              <span className="member-row__percent">
+                                {progress !== null ? `${progress}%` : `серия ${streak} ${formatStreakUnit(goal, streak)}`}
+                              </span>
                             </div>
-                            <Progress value={progress} aria-label={`Прогресс: ${isMe ? 'вы' : participant.firstName}`} />
+                            {progress !== null && <Progress value={progress} aria-label={`Прогресс: ${isMe ? 'вы' : participant.firstName}`} />}
                             <div className="member-row__bottom">
                               <span className={`member-row__status ${done ? 'member-row__status--done' : ''}`}>
                                 {done && <Icon20Check width={14} height={14} />}
@@ -120,7 +125,24 @@ export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNot
                               </span>
                               <span className="member-row__summary">{participantSummary(goal, participant)}</span>
                             </div>
+                            {isMe && (participant.cheers?.recent || 0) > 0 && (
+                              <span className="member-row__cheered">
+                                👏 Вас {plural(participant.cheers?.recent || 0, ['поддержал', 'поддержали', 'поддержали'])} {participant.cheers?.recent} {plural(participant.cheers?.recent || 0, ['участник', 'участника', 'участников'])}
+                              </span>
+                            )}
                           </div>
+                          {!isMe && (
+                            <button
+                              type="button"
+                              className={`cheer-button ${participant.cheers?.byMe ? 'cheer-button--sent' : ''}`}
+                              disabled={participant.cheers?.byMe}
+                              aria-label={participant.cheers?.byMe ? `Вы уже поддержали: ${participant.firstName}` : `Поддержать: ${participant.firstName}`}
+                              onClick={() => onCheer(goal.id, participant.userId)}
+                            >
+                              <span className="cheer-button__icon" aria-hidden>👏</span>
+                              <span>{participant.cheers?.byMe ? 'Готово' : 'Поддержать'}</span>
+                            </button>
+                          )}
                         </li>
                       );
                     })}

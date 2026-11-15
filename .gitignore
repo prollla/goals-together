@@ -6,6 +6,9 @@ build/
 *.log
 .DS_Store
 server/data/
+server/backups/
+backups/
+.tmp/
 build.zip
 .env
 .env.*
