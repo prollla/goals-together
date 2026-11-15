@@ -51,13 +51,22 @@ database.exec(`
     PRIMARY KEY (goal_id, user_id, date)
   );
 `);
+// Migration: private goals now live on the server too (before, only shared goals did).
+if (!database.prepare('PRAGMA table_info(goals)').all().some((column) => column.name === 'privacy')) {
+  database.exec("ALTER TABLE goals ADD COLUMN privacy TEXT NOT NULL DEFAULT 'group'");
+}
+
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+// Difference in days between a YYYY-MM-DD key and today's UTC date.
+const daysFromToday = (key) =>
+  (Date.parse(`${key}T00:00:00Z`) - Date.parse(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`)) / 86_400_000;
 
 const json = (response, status, body) => {
   response.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, X-User-Id, X-User-Name, X-User-Photo, X-VK-Launch-Params',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Cache-Control': 'no-store',
   });
   response.end(JSON.stringify(body));
@@ -171,7 +180,7 @@ const serializeGoal = (row, user) => {
     weeklyTarget: row.weekly_target ?? undefined,
     target: row.target ?? undefined,
     unit: row.unit ?? undefined,
-    privacy: 'group',
+    privacy: row.privacy === 'private' ? 'private' : 'group',
     entries: getEntries(row.id, user.id),
     participants: participants.map((participant) => ({
       userId: participant.user_id,
@@ -237,6 +246,22 @@ const validateDraft = (draft) => {
   };
 };
 
+// Marks are allowed for "today" and "yesterday" in the user's time zone. The server only knows UTC,
+// so the window is UTC today -2 .. +1, which covers every time zone from UTC-12 to UTC+14.
+const assertMarkableDate = (date) => {
+  if (typeof date !== 'string' || !DATE_KEY.test(date)) throw httpError(400, 'Некорректная отметка');
+  const diff = daysFromToday(date);
+  if (diff > 1 || diff < -2) throw httpError(400, 'Отметить можно только сегодня или вчера');
+};
+
+// Creation date in the user's local calendar. Migrated goals keep their original date; never in the future.
+const normalizeCreatedAt = (value) => {
+  if (typeof value === 'string' && DATE_KEY.test(value) && value >= '2020-01-01' && daysFromToday(value) <= 1) {
+    return `${value}T12:00:00.000Z`;
+  }
+  return new Date().toISOString();
+};
+
 const server = http.createServer(async (request, response) => {
   if (request.method === 'OPTIONS') {
     json(response, 204, {});
@@ -262,24 +287,25 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (request.method === 'POST' && url.pathname === '/api/goals') {
-      const { entries, ...body } = await readBody(request);
+      const { entries, createdAt: requestedCreatedAt, ...body } = await readBody(request);
       const draft = validateDraft(body);
+      const privacy = body.privacy === 'private' ? 'private' : 'group';
       const groupId = crypto.randomUUID();
-      const createdAt = new Date().toISOString();
+      const createdAt = normalizeCreatedAt(requestedCreatedAt);
       database.transaction(() => {
         database.prepare(`
-          INSERT INTO goals (id, owner_id, title, rule, category, type, color, created_at, duration, frequency, weekly_target, target, unit)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO goals (id, owner_id, title, rule, category, type, color, created_at, duration, frequency, weekly_target, target, unit, privacy)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           groupId, user.id, draft.title, draft.rule, draft.category, draft.type, draft.color, createdAt,
-          draft.duration, draft.frequency, draft.weeklyTarget, draft.target, draft.unit,
+          draft.duration, draft.frequency, draft.weeklyTarget, draft.target, draft.unit, privacy,
         );
         addParticipant(groupId, user);
         if (entries && typeof entries === 'object') {
           const insertEntry = database.prepare('INSERT OR REPLACE INTO entries (goal_id, user_id, date, status, value, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
           Object.entries(entries).forEach(([date, entry]) => {
-            if (/^\d{4}-\d{2}-\d{2}$/.test(date) && entry && ['done', 'skipped'].includes(entry.status)) {
-              insertEntry.run(groupId, user.id, date, entry.status, Number.isFinite(entry.value) ? entry.value : null, createdAt);
+            if (DATE_KEY.test(date) && daysFromToday(date) <= 1 && entry && ['done', 'skipped'].includes(entry.status)) {
+              insertEntry.run(groupId, user.id, date, entry.status, Number.isFinite(entry.value) && entry.value > 0 ? entry.value : null, new Date().toISOString());
             }
           });
         }
@@ -290,7 +316,7 @@ const server = http.createServer(async (request, response) => {
 
     if (parts[0] === 'api' && parts[1] === 'invitations' && parts[2] && request.method === 'GET') {
       const row = getGoalRow(parts[2]);
-      if (!row) throw Object.assign(new Error('Приглашение не найдено: возможно, цель удалена'), { status: 404 });
+      if (!row || row.privacy === 'private') throw httpError(404, 'Приглашение не найдено: возможно, цель удалена');
       const participantCount = database.prepare('SELECT COUNT(*) AS count FROM participants WHERE goal_id = ?').get(row.id).count;
       json(response, 200, {
         title: row.title,
@@ -322,7 +348,30 @@ const server = http.createServer(async (request, response) => {
       }
 
       if (request.method === 'POST' && parts[3] === 'join') {
+        if (row.privacy === 'private') throw httpError(404, 'Приглашение не найдено: возможно, цель удалена');
         addParticipant(groupId, user);
+        json(response, 200, serializeGoal(row, user));
+        return;
+      }
+
+      // Edit a goal: only its author; the type cannot change (it would break the history).
+      if (request.method === 'PATCH' && parts.length === 3) {
+        requireParticipant(groupId, user.id);
+        if (row.owner_id !== user.id) throw httpError(403, 'Изменять цель может только её автор');
+        const draft = validateDraft({ ...(await readBody(request)), type: row.type });
+        database.prepare(`
+          UPDATE goals SET title = ?, rule = ?, category = ?, color = ?, duration = ?, frequency = ?, weekly_target = ?, target = ?, unit = ?
+          WHERE id = ?
+        `).run(draft.title, draft.rule, draft.category, draft.color, draft.duration, draft.frequency, draft.weeklyTarget, draft.target, draft.unit, groupId);
+        json(response, 200, serializeGoal(getGoalRow(groupId), user));
+        return;
+      }
+
+      // Clear the user's mark (or the accumulated value) for one day.
+      if (request.method === 'DELETE' && parts[3] === 'entries' && parts[4]) {
+        requireParticipant(groupId, user.id);
+        assertMarkableDate(parts[4]);
+        database.prepare('DELETE FROM entries WHERE goal_id = ? AND user_id = ? AND date = ?').run(groupId, user.id, parts[4]);
         json(response, 200, serializeGoal(row, user));
         return;
       }
@@ -330,9 +379,8 @@ const server = http.createServer(async (request, response) => {
       if (request.method === 'PUT' && parts[3] === 'entries') {
         requireParticipant(groupId, user.id);
         const { date, status } = await readBody(request);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !['done', 'skipped'].includes(status)) {
-          throw Object.assign(new Error('Некорректная отметка'), { status: 400 });
-        }
+        assertMarkableDate(date);
+        if (!['done', 'skipped'].includes(status)) throw httpError(400, 'Некорректная отметка');
         const current = database.prepare('SELECT status, value FROM entries WHERE goal_id = ? AND user_id = ? AND date = ?').get(groupId, user.id, date);
         if (current?.status === status && current.value === null) {
           database.prepare('DELETE FROM entries WHERE goal_id = ? AND user_id = ? AND date = ?').run(groupId, user.id, date);
@@ -349,9 +397,8 @@ const server = http.createServer(async (request, response) => {
       if (request.method === 'POST' && parts[3] === 'entries') {
         requireParticipant(groupId, user.id);
         const { date, value } = await readBody(request);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(value) || value <= 0) {
-          throw Object.assign(new Error('Некорректная отметка'), { status: 400 });
-        }
+        assertMarkableDate(date);
+        if (!Number.isFinite(value) || value <= 0 || value > 1e9) throw httpError(400, 'Некорректная отметка');
         database.prepare(`
           INSERT INTO entries (goal_id, user_id, date, status, value, updated_at) VALUES (?, ?, ?, 'done', ?, ?)
           ON CONFLICT(goal_id, user_id, date) DO UPDATE SET status = 'done', value = COALESCE(entries.value, 0) + excluded.value, updated_at = excluded.updated_at

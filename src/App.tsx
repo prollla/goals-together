@@ -6,7 +6,7 @@ import {
 } from '@vkontakte/vkui';
 import { Icon28HomeOutline, Icon28ListOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { useActiveVkuiLocation, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { Catalog, CreateGoal, GoalDetails, Goals, Group, Home, JoinGoal } from './panels';
+import { Catalog, CreateGoal, EditGoal, GoalDetails, Goals, Group, Home, JoinGoal } from './panels';
 import { DEFAULT_VIEW_PANELS } from './routes';
 import { useGoals } from './hooks/useGoals';
 import { GoalDraft, GoalTemplate } from './types';
@@ -26,7 +26,8 @@ export const App = () => {
   const [fetchedUser, setUser] = useState<UserInfo | undefined>();
   // Inside VK, wait for the profile before talking to the API (outside VK there is nothing to wait for).
   const [profileReady, setProfileReady] = useState(() => !isVkLaunch());
-  const { goals, createGoal, createShared, joinShared, deleteGoal, markGoal, addValue, serverError, sharedLoaded } = useGoals(fetchedUser, profileReady);
+  const { goals, createGoal, updateGoal, joinShared, deleteGoal, markGoal, addValue, resetDay, serverError, loaded } = useGoals(fetchedUser, profileReady);
+  const goalActions = { onMark: markGoal, onAddValue: addValue, onResetDay: resetDay };
   const [popout, setPopout] = useState<ReactNode | null>(<ScreenSpinner />);
   const [selectedTemplate, setSelectedTemplate] = useState<GoalTemplate | undefined>();
   const [inviteGroupId, setInviteGroupId] = useState<string | null>(() => parseGoalInvite(window.location.search));
@@ -74,7 +75,7 @@ export const App = () => {
 
   const addGoal = async (draft: GoalDraft, message: string) => {
     try {
-      const goal = draft.privacy === 'group' ? await createShared(draft) : createGoal({ ...draft, groupId: undefined });
+      const goal = await createGoal({ ...draft, groupId: undefined });
       setNotice(message);
       routeNavigator.push(`/goal/${goal.id}`);
     } catch (error) {
@@ -83,6 +84,16 @@ export const App = () => {
   };
 
   const submitGoal = (draft: GoalDraft) => addGoal(draft, 'Цель создана. Первый шаг можно отметить уже сегодня.');
+
+  const saveGoal = async (id: string, draft: GoalDraft) => {
+    try {
+      await updateGoal(id, draft);
+      setNotice('Изменения сохранены');
+      routeNavigator.back();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Не удалось сохранить изменения');
+    }
+  };
 
   const acceptInvite = async (groupId: string) => {
     try {
@@ -120,6 +131,7 @@ export const App = () => {
     [DEFAULT_VIEW_PANELS.GOAL]: DEFAULT_VIEW_PANELS.GOALS,
     [DEFAULT_VIEW_PANELS.CREATE]: DEFAULT_VIEW_PANELS.GOALS,
     [DEFAULT_VIEW_PANELS.CATALOG]: DEFAULT_VIEW_PANELS.GOALS,
+    [DEFAULT_VIEW_PANELS.EDIT]: DEFAULT_VIEW_PANELS.GOALS,
     [DEFAULT_VIEW_PANELS.JOIN]: DEFAULT_VIEW_PANELS.GROUP,
   }[activePanel] || activePanel;
 
@@ -133,13 +145,23 @@ export const App = () => {
         className={showTabbar ? 'app-with-tabbar' : ''}
       >
         <View activePanel={activePanel}>
-          <Home id={DEFAULT_VIEW_PANELS.HOME} fetchedUser={fetchedUser} goals={goals} serverError={serverError} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} onMark={markGoal} onAddValue={addValue} />
-          <Goals id={DEFAULT_VIEW_PANELS.GOALS} goals={goals} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} onMark={markGoal} onAddValue={addValue} />
+          <Home id={DEFAULT_VIEW_PANELS.HOME} fetchedUser={fetchedUser} goals={goals} serverError={serverError} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} {...goalActions} />
+          <Goals id={DEFAULT_VIEW_PANELS.GOALS} goals={goals} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} {...goalActions} />
           <Group id={DEFAULT_VIEW_PANELS.GROUP} goals={goals} fetchedUser={fetchedUser} onCreateGoal={openCustomGoal} serverError={serverError} onNotice={setNotice} />
           <Catalog id={DEFAULT_VIEW_PANELS.CATALOG} onSelect={selectTemplate} />
           <CreateGoal key={selectedTemplate?.id || 'custom'} id={DEFAULT_VIEW_PANELS.CREATE} template={selectedTemplate} onCreate={submitGoal} />
-          <GoalDetails id={DEFAULT_VIEW_PANELS.GOAL} goals={goals} loading={!sharedLoaded} currentUserId={getApiUserId(fetchedUser)} onOpenGoal={openGoal} onMark={markGoal} onAddValue={addValue} onDelete={removeGoal} />
+          <GoalDetails
+            id={DEFAULT_VIEW_PANELS.GOAL}
+            goals={goals}
+            loading={!loaded}
+            currentUserId={getApiUserId(fetchedUser)}
+            onOpenGoal={openGoal}
+            onEdit={(goalId) => routeNavigator.push(`/edit/${goalId}`)}
+            onDelete={removeGoal}
+            {...goalActions}
+          />
           <JoinGoal id={DEFAULT_VIEW_PANELS.JOIN} groupId={inviteGroupId} fetchedUser={fetchedUser} onAccept={acceptInvite} onDismiss={dismissInvite} />
+          <EditGoal id={DEFAULT_VIEW_PANELS.EDIT} goals={goals} loading={!loaded} onSave={saveGoal} />
         </View>
         {showTabbar && (
           <Tabbar>

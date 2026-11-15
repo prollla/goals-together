@@ -2,7 +2,7 @@ import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import { Avatar, Button, Div, Group as VKGroup, Header, IconButton, Panel, PanelHeader, Progress } from '@vkontakte/vkui';
 import { Icon20Check, Icon24ShareOutline, Icon28AddOutline, Icon28ShareOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { Goal, GoalParticipant, NavIdProps } from '../types';
-import { formatNumber, getCurrentValue, getDoneDays, getProgress, isDone, plural, toDateKey } from '../utils/goals';
+import { formatNumber, formatStreakUnit, getCurrentValue, getDoneDays, getProgress, getStreak, isDone, plural, toDateKey } from '../utils/goals';
 import { createGoalInviteLink } from '../utils/invite';
 import { getApiUserId } from '../api';
 import { GoalTypeIcon } from '../components/GoalTypeIcon';
@@ -103,16 +103,20 @@ export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNot
                     {participants.map((participant) => {
                       const isMe = participant.userId === currentUserId;
                       const done = isDone(participant.entries[today]);
-                      const progress = getProgress({ ...goal, entries: participant.entries });
+                      const participantGoal = { ...goal, entries: participant.entries };
+                      const progress = getProgress(participantGoal);
+                      const streak = getStreak(participantGoal);
                       return (
                         <li className="member-row" key={participant.userId}>
                           <Avatar size={40} src={participant.photoUrl} initials={(isMe ? 'Вы' : participant.firstName).slice(0, 1)} gradientColor="blue" />
                           <div className="member-row__body">
                             <div className="member-row__top">
                               <span className="member-row__name">{isMe ? 'Вы' : participant.firstName}</span>
-                              <span className="member-row__percent">{progress}%</span>
+                              <span className="member-row__percent">
+                                {progress !== null ? `${progress}%` : `серия ${streak} ${formatStreakUnit(goal, streak)}`}
+                              </span>
                             </div>
-                            <Progress value={progress} aria-label={`Прогресс: ${isMe ? 'вы' : participant.firstName}`} />
+                            {progress !== null && <Progress value={progress} aria-label={`Прогресс: ${isMe ? 'вы' : participant.firstName}`} />}
                             <div className="member-row__bottom">
                               <span className={`member-row__status ${done ? 'member-row__status--done' : ''}`}>
                                 {done && <Icon20Check width={14} height={14} />}

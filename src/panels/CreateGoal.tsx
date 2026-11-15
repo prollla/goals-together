@@ -1,13 +1,22 @@
 import { FormEvent, useState } from 'react';
 import { Button, Caption, Div, FormItem, FormLayoutGroup, Input, Panel, PanelHeader, PanelHeaderBack, Radio, RadioGroup, Select, Textarea, Title } from '@vkontakte/vkui';
 import { useSafeBack } from '../hooks/useSafeBack';
-import { GoalColor, GoalDraft, GoalFrequency, GoalPrivacy, GoalTemplate, GoalType, NavIdProps } from '../types';
+import { Goal, GoalColor, GoalDraft, GoalFrequency, GoalPrivacy, GoalTemplate, GoalType, NavIdProps } from '../types';
 import { GoalTypeIcon } from '../components/GoalTypeIcon';
 
 interface CreateGoalProps extends NavIdProps {
   template?: GoalTemplate;
+  /** Edit mode: the form starts from this goal; its type and privacy cannot change. */
+  goal?: Goal;
   onCreate: (draft: GoalDraft) => Promise<void> | void;
 }
+
+const durationOptions = [
+  { label: '7 дней', value: '7' },
+  { label: '14 дней', value: '14' },
+  { label: '30 дней', value: '30' },
+  { label: 'Без ограничения', value: '0' },
+];
 
 const typeOptions: { type: GoalType; title: string; subtitle: string }[] = [
   { type: 'quit', title: 'Отказаться', subtitle: 'Отмечать дни без привычки' },
@@ -18,19 +27,25 @@ const typeOptions: { type: GoalType; title: string; subtitle: string }[] = [
 const colors: GoalColor[] = ['violet', 'green', 'orange', 'blue'];
 const colorNames: Record<GoalColor, string> = { violet: 'фиолетовый', green: 'зелёный', orange: 'оранжевый', blue: 'синий' };
 
-export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
+export const CreateGoal = ({ id, template, goal, onCreate }: CreateGoalProps) => {
   const goBack = useSafeBack();
-  const [type, setType] = useState<GoalType>(template?.type || 'regular');
-  const [title, setTitle] = useState(template?.title || '');
-  const [rule, setRule] = useState(template?.rule || '');
-  const [category, setCategory] = useState(template?.category || 'Развитие');
-  const [color, setColor] = useState<GoalColor>(template?.color || 'violet');
-  const [duration, setDuration] = useState(String(template?.duration ?? 30));
-  const [frequency, setFrequency] = useState<GoalFrequency>(template?.frequency || 'daily');
-  const [weeklyTarget, setWeeklyTarget] = useState(String(template?.weeklyTarget || 3));
-  const [target, setTarget] = useState(String(template?.target || 100));
-  const [unit, setUnit] = useState(template?.unit || 'раз');
-  const [privacy, setPrivacy] = useState<GoalPrivacy>('private');
+  const source = goal || template;
+  const editing = Boolean(goal);
+  const [type, setType] = useState<GoalType>(source?.type || 'regular');
+  const [title, setTitle] = useState(source?.title || '');
+  const [rule, setRule] = useState(source?.rule || '');
+  const [category, setCategory] = useState(source?.category || 'Развитие');
+  const [color, setColor] = useState<GoalColor>(source?.color || 'violet');
+  const [duration, setDuration] = useState(String(source?.duration ?? 30));
+  const [frequency, setFrequency] = useState<GoalFrequency>(source?.frequency || 'daily');
+  const [weeklyTarget, setWeeklyTarget] = useState(String(source?.weeklyTarget || 3));
+  const [target, setTarget] = useState(String(source?.target || 100));
+  const [unit, setUnit] = useState(source?.unit || 'раз');
+  const [privacy, setPrivacy] = useState<GoalPrivacy>(goal?.privacy || 'private');
+  // A goal created with a non-standard duration (e.g. 60 days) keeps its value selectable.
+  const durations = durationOptions.some((option) => option.value === duration)
+    ? durationOptions
+    : [{ label: `${duration} дней`, value: duration }, ...durationOptions];
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -78,15 +93,24 @@ export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<PanelHeaderBack onClick={goBack} />}>{template ? 'Настройка цели' : 'Новая цель'}</PanelHeader>
+      <PanelHeader before={<PanelHeaderBack onClick={goBack} />}>{editing ? 'Изменить цель' : template ? 'Настройка цели' : 'Новая цель'}</PanelHeader>
       <form onSubmit={(event) => void submit(event)}>
         <Div className="create-intro">
-          <Title level="2" weight="2">Какую цель хотите достичь?</Title>
-          <Caption>Сформулируйте понятное правило — его будет легко отметить.</Caption>
+          <Title level="2" weight="2">{editing ? 'Что поменять в цели?' : 'Какую цель хотите достичь?'}</Title>
+          <Caption>
+            {editing ? 'История отметок сохранится. Тип цели изменить нельзя.' : 'Сформулируйте понятное правило — его будет легко отметить.'}
+          </Caption>
         </Div>
         <Div className="goal-type-selector">
-          {typeOptions.map((option) => (
-            <button key={option.type} type="button" className={`goal-type ${type === option.type ? 'goal-type--active' : ''}`} onClick={() => changeType(option.type)}>
+          {/* In edit mode only the current type is shown, as a non-interactive label. */}
+          {typeOptions.filter((option) => !editing || option.type === type).map((option) => (
+            <button
+              key={option.type}
+              type="button"
+              disabled={editing}
+              className={`goal-type ${type === option.type ? 'goal-type--active' : ''}`}
+              onClick={() => changeType(option.type)}
+            >
               <GoalTypeIcon type={option.type} size={26} />
               <span><strong>{option.title}</strong><small>{option.subtitle}</small></span>
             </button>
@@ -118,12 +142,7 @@ export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
               </FormItem>
             )}
             <FormItem top="Срок">
-              <Select value={duration} onChange={(event) => setDuration(event.target.value)} options={[
-                { label: '7 дней', value: '7' },
-                { label: '14 дней', value: '14' },
-                { label: '30 дней', value: '30' },
-                { label: 'Без ограничения', value: '0' },
-              ]} />
+              <Select value={duration} onChange={(event) => setDuration(event.target.value)} options={durations} />
             </FormItem>
             {type === 'quantity' && (
               <FormLayoutGroup mode="horizontal">
@@ -144,13 +163,19 @@ export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
             </FormItem>
           </Div>
           <Div className="form-section">
-            <FormItem top="Кто увидит прогресс" />
-            <RadioGroup mode="vertical">
-              <Radio name="privacy" value="private" checked={privacy === 'private'} onChange={() => setPrivacy('private')} description="Прогресс видите только вы">Личная цель</Radio>
-              <Radio name="privacy" value="group" checked={privacy === 'group'} onChange={() => setPrivacy('group')} description="У каждого свой прогресс, результаты видны участникам">Цель с друзьями</Radio>
-            </RadioGroup>
+            {!editing && (
+              <>
+                <FormItem top="Кто увидит прогресс" />
+                <RadioGroup mode="vertical">
+                  <Radio name="privacy" value="private" checked={privacy === 'private'} onChange={() => setPrivacy('private')} description="Прогресс видите только вы">Личная цель</Radio>
+                  <Radio name="privacy" value="group" checked={privacy === 'group'} onChange={() => setPrivacy('group')} description="У каждого свой прогресс, результаты видны участникам">Цель с друзьями</Radio>
+                </RadioGroup>
+              </>
+            )}
             {error && <Caption className="form-error">{error}</Caption>}
-            <Button stretched size="l" type="submit" className="submit-goal" loading={submitting} disabled={submitting}>Создать цель</Button>
+            <Button stretched size="l" type="submit" className="submit-goal" loading={submitting} disabled={submitting}>
+              {editing ? 'Сохранить' : 'Создать цель'}
+            </Button>
           </Div>
         </FormLayoutGroup>
       </form>

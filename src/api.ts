@@ -50,10 +50,18 @@ const request = async <T>(path: string, user: UserInfo | undefined, options: Req
   return data as T;
 };
 
-export const getSharedGoals = (user?: UserInfo) => request<Goal[]>('/api/goals', user);
+/** All goals of the user, private and shared. */
+export const getGoals = (user?: UserInfo) => request<Goal[]>('/api/goals', user);
 
-export const createSharedGoal = (draft: GoalDraft, user?: UserInfo, entries?: Record<string, GoalEntry>) =>
-  request<Goal>('/api/goals', user, { method: 'POST', body: JSON.stringify({ ...draft, entries }) });
+/** createdAt/entries are only sent when moving a goal from local storage to the server. */
+export const createGoalOnServer = (draft: GoalDraft, user?: UserInfo, migrated?: { createdAt: string; entries: Record<string, GoalEntry> }) =>
+  request<Goal>('/api/goals', user, { method: 'POST', body: JSON.stringify({ ...draft, ...migrated }) });
+
+export const updateGoalOnServer = (id: string, draft: GoalDraft, user?: UserInfo) =>
+  request<Goal>(`/api/goals/${id}`, user, { method: 'PATCH', body: JSON.stringify(draft) });
+
+export const clearEntry = (id: string, date: string, user?: UserInfo) =>
+  request<Goal>(`/api/goals/${id}/entries/${date}`, user, { method: 'DELETE' });
 
 export const joinSharedGoal = (groupId: string, user?: UserInfo) =>
   request<Goal>(`/api/goals/${groupId}/join`, user, { method: 'POST' });

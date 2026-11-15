@@ -380,8 +380,54 @@ button:focus-visible {
 }
 
 .today-result {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 8px;
+  color: var(--goal-accent);
+  font-weight: 600;
+}
+
+.goal-card__completed,
+.goal-card__day-off {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.goal-card__completed {
+  color: var(--success-strong);
+  background: var(--success-bg);
+}
+
+.goal-card__day-off {
+  color: var(--vkui--color_text_secondary);
+  background: var(--vkui--color_background_secondary);
+  font-weight: 500;
+}
+
+.goal-card--completed .goal-card__icon {
+  filter: saturate(0.7);
+}
+
+.goal-card__yesterday {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 0 0;
+  border: 0;
+  color: var(--vkui--color_text_secondary);
+  background: transparent;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.goal-card__yesterday strong {
   color: var(--goal-accent);
   font-weight: 600;
 }
@@ -686,6 +732,38 @@ button:focus-visible {
   border-radius: 50%;
 }
 
+.calendar-day--off {
+  opacity: 0.35;
+}
+
+button.calendar-day {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.calendar-day--tappable {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 55%, transparent);
+}
+
+.calendar-day--today strong {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.calendar-hint {
+  display: block;
+  margin-top: 8px;
+  color: var(--vkui--color_text_secondary);
+}
+
+.goal-manage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legend-dot--off { background: var(--vkui--color_background_secondary); box-shadow: inset 0 0 0 1px var(--vkui--color_separator_primary); }
 .legend-dot--done { background: #55b894; }
 .legend-dot--skipped { background: #b3b6bf; }
 
