@@ -3,7 +3,7 @@ import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import { Avatar, Button, Caption, Div, Group as VKGroup, Header, Panel, PanelHeader, Progress, Snackbar, Text, Title } from '@vkontakte/vkui';
 import { Icon28AddOutline, Icon28ShareOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { Goal, NavIdProps } from '../types';
-import { getDoneDays, getProgress, isDone, toDateKey } from '../utils/goals';
+import { getDoneDays, getProgress, isDone, plural, toDateKey } from '../utils/goals';
 import { createGoalInviteLink } from '../utils/invite';
 import { getApiUserId } from '../api';
 
@@ -77,7 +77,7 @@ export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError }: Gro
                         <span className={`member-status ${done ? 'member-status--done' : 'member-status--pending'}`}>{done ? 'Выполнено' : 'В процессе'}</span>
                       </div>
                       <Progress value={progress} aria-label={`Прогресс участника ${participant.firstName}`} />
-                      <div className="member-card__footer"><Caption>{getDoneDays(participantGoal)} успешных дней</Caption><strong>{progress}%</strong></div>
+                      <div className="member-card__footer"><Caption>{getDoneDays(participantGoal)} {plural(getDoneDays(participantGoal), ['успешный день', 'успешных дня', 'успешных дней'])}</Caption><strong>{progress}%</strong></div>
                     </div>
                   );
                 })}

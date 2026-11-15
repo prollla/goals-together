@@ -69,7 +69,7 @@ const readBody = async (request) => {
   let body = '';
   for await (const chunk of request) {
     body += chunk;
-    if (body.length > 100_000) throw httpError(413, 'Request body is too large');
+    if (body.length > 100_000) throw httpError(413, 'Слишком большой запрос');
   }
   if (!body) return {};
   try {
@@ -77,7 +77,7 @@ const readBody = async (request) => {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
     return parsed;
   } catch {
-    throw httpError(400, 'Invalid JSON');
+    throw httpError(400, 'Некорректный формат запроса');
   }
 };
 
@@ -130,7 +130,7 @@ const getUser = (request) => {
   let userId = decodeHeader(request.headers['x-user-id'], '1');
   if (isProduction) {
     userId = verifyLaunchParams(request.headers['x-vk-launch-params'] || '');
-    if (!userId) throw httpError(401, 'Invalid VK launch parameters');
+    if (!userId) throw httpError(401, 'Сессия VK устарела или недействительна. Перезапустите приложение.');
   }
   // null means "unknown": the stored profile is kept instead of being overwritten with a placeholder.
   const firstName = decodeHeader(request.headers['x-user-name']).trim().slice(0, 80);
@@ -145,7 +145,7 @@ const getGoalRow = (groupId) => database.prepare('SELECT * FROM goals WHERE id =
 const getParticipant = (groupId, userId) => database.prepare('SELECT * FROM participants WHERE goal_id = ? AND user_id = ?').get(groupId, userId);
 const requireParticipant = (groupId, userId) => {
   const participant = getParticipant(groupId, userId);
-  if (!participant) throw Object.assign(new Error('Goal not found'), { status: 404 });
+  if (!participant) throw Object.assign(new Error('Цель не найдена или вы в ней не участвуете'), { status: 404 });
   return participant;
 };
 
@@ -211,18 +211,18 @@ const GOAL_FREQUENCIES = ['daily', 'weekdays', 'weekly'];
 const optionalNumber = (value, isValid) => {
   if (value === undefined || value === null || value === '') return null;
   const number = Number(value);
-  if (!Number.isFinite(number) || !isValid(number)) throw httpError(400, 'Invalid goal');
+  if (!Number.isFinite(number) || !isValid(number)) throw httpError(400, 'Проверьте параметры цели');
   return number;
 };
 
 // Returns a normalized draft or throws 400; nothing from the client reaches the database unchecked.
 const validateDraft = (draft) => {
   const title = typeof draft.title === 'string' ? draft.title.trim().slice(0, 80) : '';
-  if (!title || !GOAL_TYPES.includes(draft.type)) throw httpError(400, 'Invalid goal');
+  if (!title || !GOAL_TYPES.includes(draft.type)) throw httpError(400, 'Проверьте параметры цели');
   const duration = optionalNumber(draft.duration, (n) => Number.isInteger(n) && n >= 0 && n <= 3650) ?? 0;
   const frequency = GOAL_FREQUENCIES.includes(draft.frequency) ? draft.frequency : 'daily';
   const target = draft.type === 'quantity' ? optionalNumber(draft.target, (n) => n > 0 && n <= 1e9) : null;
-  if (draft.type === 'quantity' && target === null) throw httpError(400, 'Invalid goal');
+  if (draft.type === 'quantity' && target === null) throw httpError(400, 'Проверьте параметры цели');
   return {
     title,
     rule: typeof draft.rule === 'string' ? draft.rule.trim().slice(0, 180) : '',
@@ -290,7 +290,7 @@ const server = http.createServer(async (request, response) => {
 
     if (parts[0] === 'api' && parts[1] === 'invitations' && parts[2] && request.method === 'GET') {
       const row = getGoalRow(parts[2]);
-      if (!row) throw Object.assign(new Error('Invitation not found'), { status: 404 });
+      if (!row) throw Object.assign(new Error('Приглашение не найдено: возможно, цель удалена'), { status: 404 });
       const participantCount = database.prepare('SELECT COUNT(*) AS count FROM participants WHERE goal_id = ?').get(row.id).count;
       json(response, 200, {
         title: row.title,
@@ -313,7 +313,7 @@ const server = http.createServer(async (request, response) => {
     if (parts[0] === 'api' && parts[1] === 'goals' && parts[2]) {
       const groupId = parts[2];
       const row = getGoalRow(groupId);
-      if (!row) throw Object.assign(new Error('Goal not found'), { status: 404 });
+      if (!row) throw Object.assign(new Error('Цель не найдена или вы в ней не участвуете'), { status: 404 });
 
       if (request.method === 'GET' && parts.length === 3) {
         requireParticipant(groupId, user.id);
@@ -331,7 +331,7 @@ const server = http.createServer(async (request, response) => {
         requireParticipant(groupId, user.id);
         const { date, status } = await readBody(request);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !['done', 'skipped'].includes(status)) {
-          throw Object.assign(new Error('Invalid entry'), { status: 400 });
+          throw Object.assign(new Error('Некорректная отметка'), { status: 400 });
         }
         const current = database.prepare('SELECT status, value FROM entries WHERE goal_id = ? AND user_id = ? AND date = ?').get(groupId, user.id, date);
         if (current?.status === status && current.value === null) {
@@ -350,7 +350,7 @@ const server = http.createServer(async (request, response) => {
         requireParticipant(groupId, user.id);
         const { date, value } = await readBody(request);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(value) || value <= 0) {
-          throw Object.assign(new Error('Invalid entry'), { status: 400 });
+          throw Object.assign(new Error('Некорректная отметка'), { status: 400 });
         }
         database.prepare(`
           INSERT INTO entries (goal_id, user_id, date, status, value, updated_at) VALUES (?, ?, ?, 'done', ?, ?)
@@ -375,7 +375,7 @@ const server = http.createServer(async (request, response) => {
       }
     }
 
-    json(response, 404, { error: 'Not found' });
+    json(response, 404, { error: 'Не найдено' });
   } catch (error) {
     if (error.status) {
       json(response, error.status, { error: error.message });

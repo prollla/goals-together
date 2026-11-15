@@ -4,6 +4,7 @@ import { Button, Caption, Div, Panel, PanelHeader, PanelHeaderBack, Text, Title 
 import { GoalDraft, NavIdProps } from '../types';
 import { GoalTypeIcon } from '../components/GoalTypeIcon';
 import { getInvitation } from '../api';
+import { plural } from '../utils/goals';
 
 interface JoinGoalProps extends NavIdProps {
   groupId?: string | null;
@@ -58,7 +59,7 @@ export const JoinGoal = ({ id, groupId, fetchedUser, onAccept, onDismiss }: Join
                   <Title level="2" weight="2">{invitation.title}</Title>
                   <Text>{invitation.rule}</Text>
                   <div className="invite-goal__details">
-                    {invitation.duration > 0 && <Caption>Срок: {invitation.duration} дней</Caption>}
+                    {invitation.duration > 0 && <Caption>Срок: {invitation.duration} {plural(invitation.duration, ['день', 'дня', 'дней'])}</Caption>}
                     {invitation.type === 'quantity' && <Caption>Результат: {invitation.target} {invitation.unit}</Caption>}
                     <Caption>Уже участвует: {invitation.participantCount}</Caption>
                   </div>

@@ -4,7 +4,7 @@ import { Icon28DeleteOutline } from '@vkontakte/icons';
 import { useParams } from '@vkontakte/vk-mini-apps-router';
 import { useSafeBack } from '../hooks/useSafeBack';
 import { Goal, NavIdProps } from '../types';
-import { dateFromKey, getCurrentValue, getDoneDays, getProgress, getStreak, shiftDate, toDateKey } from '../utils/goals';
+import { dateFromKey, getCurrentValue, getDoneDays, getProgress, getStreak, plural, shiftDate, toDateKey } from '../utils/goals';
 import { GoalCard } from '../components/GoalCard';
 
 interface GoalDetailsProps extends NavIdProps {
@@ -47,8 +47,8 @@ export const GoalDetails = ({ id, goals, loading, currentUserId, onOpenGoal, onM
       </Div>
       <Group mode="plain" header={<Header size="s">Ваши достижения</Header>}>
         <Div className="stats-grid">
-          <div className="stat-card"><strong>{streak}</strong><Caption>{streak === 1 ? 'день подряд' : 'дней подряд'}</Caption></div>
-          <div className="stat-card"><strong>{goal.type === 'quantity' ? currentValue.toLocaleString('ru-RU') : doneDays}</strong><Caption>{goal.type === 'quantity' ? goal.unit : doneDays === 1 ? 'успешный день' : 'успешных дней'}</Caption></div>
+          <div className="stat-card"><strong>{streak}</strong><Caption>{plural(streak, ['день подряд', 'дня подряд', 'дней подряд'])}</Caption></div>
+          <div className="stat-card"><strong>{goal.type === 'quantity' ? currentValue.toLocaleString('ru-RU') : doneDays}</strong><Caption>{goal.type === 'quantity' ? goal.unit : plural(doneDays, ['успешный день', 'успешных дня', 'успешных дней'])}</Caption></div>
           <div className="stat-card"><strong>{progress}%</strong><Caption>общий прогресс</Caption></div>
         </Div>
       </Group>
@@ -90,7 +90,7 @@ export const GoalDetails = ({ id, goals, loading, currentUserId, onOpenGoal, onM
           description={goal.privacy === 'group' && goal.ownerId !== currentUserId
             ? 'Ваша история в этой цели будет удалена. Цель и прогресс остальных участников сохранятся.'
             : goal.privacy === 'group' && (goal.participants?.length || 1) > 1
-              ? `«${goal.title}» будет удалена у всех участников (${goal.participants?.length}) вместе с их прогрессом. Это действие нельзя отменить.`
+              ? `Цель «${goal.title}» будет удалена у всех участников (${goal.participants?.length}) вместе с их прогрессом. Это действие нельзя отменить.`
               : `«${goal.title}» и вся история прогресса будут удалены. Это действие нельзя отменить.`}
           actionsLayout="vertical"
           actions={[

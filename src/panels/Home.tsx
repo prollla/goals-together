@@ -4,7 +4,7 @@ import { Icon28AddOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Goal, NavIdProps } from '../types';
-import { formatToday, isDone, toDateKey } from '../utils/goals';
+import { formatToday, isDone, plural, toDateKey } from '../utils/goals';
 import { GoalCard } from '../components/GoalCard';
 
 interface HomeProps extends NavIdProps {
@@ -39,7 +39,7 @@ export const Home = ({ id, fetchedUser, goals, onOpenGoal, onCreateGoal, onMark,
           <div className="daily-summary__content">
             <Caption className="daily-summary__eyebrow">Ваш фокус на сегодня</Caption>
             <Title level="2" weight="2" className="daily-summary__title">
-              {goals.length === 0 ? 'Начните с первой цели' : allDone ? 'Всё выполнено!' : `${completed} из ${goals.length} целей`}
+              {goals.length === 0 ? 'Начните с первой цели' : allDone ? 'Всё выполнено!' : `${completed} из ${goals.length} ${plural(goals.length, ['цели', 'целей', 'целей'])}`}
             </Title>
             <Text className="daily-summary__text">
               {goals.length === 0 ? 'Определите небольшой шаг, который хотите сделать.' : allDone ? 'Отличная работа. Можно выдохнуть.' : 'Отметьте прогресс — без давления и обязательств.'}
