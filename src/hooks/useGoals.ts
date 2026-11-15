@@ -4,6 +4,7 @@ import { Goal, GoalDraft, GoalEntry } from '../types';
 import { toDateKey } from '../utils/goals';
 import {
   addSharedValue,
+  cheerParticipant,
   clearEntry,
   createGoalOnServer,
   deleteSharedGoal,
@@ -160,6 +161,11 @@ export const useGoals = (user?: UserInfo, ready = true) => {
     void addSharedValue(id, date, value, user).then(replace).catch(reportError);
   };
 
+  /** «Поддержать» another participant of a shared goal. */
+  const cheer = (id: string, to: string) => {
+    void cheerParticipant(id, to, user).then(replace).catch(reportError);
+  };
+
   /** Clears the user's mark or accumulated value for one day. */
   const resetDay = (id: string, date = toDateKey()) => {
     if (isLocal(id)) {
@@ -182,6 +188,7 @@ export const useGoals = (user?: UserInfo, ready = true) => {
     markGoal,
     addValue,
     resetDay,
+    cheer,
     serverError,
     loaded,
   };

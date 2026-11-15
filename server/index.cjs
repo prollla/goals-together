@@ -3,6 +3,8 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const Database = require('better-sqlite3');
+const { createVk } = require('./vk.cjs');
+const { startBackups } = require('./backup.cjs');
 
 const port = Number(process.env.PORT || 3001);
 const isProduction = process.env.NODE_ENV === 'production';
@@ -50,7 +52,35 @@ database.exec(`
     updated_at TEXT NOT NULL,
     PRIMARY KEY (goal_id, user_id, date)
   );
+  CREATE TABLE IF NOT EXISTS cheers (
+    goal_id TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+    from_user TEXT NOT NULL,
+    to_user TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS cheers_by_goal ON cheers (goal_id, to_user, created_at);
+  -- Names and avatars fetched from the VK API (only with VK_SERVICE_KEY).
+  CREATE TABLE IF NOT EXISTS profiles (
+    user_id TEXT PRIMARY KEY,
+    first_name TEXT NOT NULL,
+    photo_url TEXT,
+    fetched_at TEXT NOT NULL
+  );
+  -- Reminder preferences: tz_offset is minutes east of UTC (Moscow = 180).
+  CREATE TABLE IF NOT EXISTS user_settings (
+    user_id TEXT PRIMARY KEY,
+    notifications INTEGER NOT NULL DEFAULT 0,
+    tz_offset INTEGER NOT NULL DEFAULT 180,
+    last_reminded TEXT
+  );
 `);
+
+const vk = createVk(process.env.VK_SERVICE_KEY);
+startBackups(database, {
+  dir: process.env.BACKUP_DIR,
+  keep: Number(process.env.BACKUP_KEEP || 14),
+  intervalMs: Number(process.env.BACKUP_INTERVAL_MS || 24 * 60 * 60 * 1000),
+});
 // Migration: private goals now live on the server too (before, only shared goals did).
 if (!database.prepare('PRAGMA table_info(goals)').all().some((column) => column.name === 'privacy')) {
   database.exec("ALTER TABLE goals ADD COLUMN privacy TEXT NOT NULL DEFAULT 'group'");
@@ -135,16 +165,48 @@ const sanitizePhotoUrl = (value) => {
   }
 };
 
+// --- Verified profiles (VK_SERVICE_KEY): names and avatars come from VK, never from request headers. ---
+const PROFILE_TTL_MS = 24 * 60 * 60 * 1000;
+const profileRefreshAttempts = new Map(); // user_id -> last attempt time; at most one VK call per user per 10 min
+
+const refreshVerifiedProfile = async (userId) => {
+  const last = profileRefreshAttempts.get(userId) || 0;
+  if (Date.now() - last < 10 * 60 * 1000) return;
+  profileRefreshAttempts.set(userId, Date.now());
+  try {
+    const [vkUser] = await vk.getUsers([userId]);
+    if (!vkUser) return;
+    const firstName = String(vkUser.first_name || 'Участник').slice(0, 80);
+    const photoUrl = sanitizePhotoUrl(vkUser.photo_200);
+    database.prepare(`
+      INSERT INTO profiles (user_id, first_name, photo_url, fetched_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET first_name = excluded.first_name, photo_url = excluded.photo_url, fetched_at = excluded.fetched_at
+    `).run(userId, firstName, photoUrl, new Date().toISOString());
+    database.prepare('UPDATE participants SET first_name = ?, photo_url = ? WHERE user_id = ?').run(firstName, photoUrl, userId);
+  } catch (error) {
+    console.error('VK profile refresh failed', error.message);
+  }
+};
+
+const getVerifiedProfile = (userId) => {
+  const profile = database.prepare('SELECT first_name, photo_url, fetched_at FROM profiles WHERE user_id = ?').get(userId);
+  if (!profile || Date.now() - Date.parse(profile.fetched_at) > PROFILE_TTL_MS) void refreshVerifiedProfile(userId);
+  return { firstName: profile?.first_name ?? null, photoUrl: profile?.photo_url ?? null };
+};
+
 const getUser = (request) => {
   let userId = decodeHeader(request.headers['x-user-id'], '1');
   if (isProduction) {
     userId = verifyLaunchParams(request.headers['x-vk-launch-params'] || '');
     if (!userId) throw httpError(401, 'Сессия VK устарела или недействительна. Перезапустите приложение.');
   }
+  userId = String(userId);
+  if (vk.enabled) return { id: userId, ...getVerifiedProfile(userId) };
+  // Without a service key the client-reported profile is used.
   // null means "unknown": the stored profile is kept instead of being overwritten with a placeholder.
   const firstName = decodeHeader(request.headers['x-user-name']).trim().slice(0, 80);
   return {
-    id: String(userId),
+    id: userId,
     firstName: firstName || null,
     photoUrl: sanitizePhotoUrl(decodeHeader(request.headers['x-user-photo'])),
   };
@@ -162,6 +224,21 @@ const getEntries = (groupId, userId) => Object.fromEntries(
   database.prepare('SELECT date, status, value FROM entries WHERE goal_id = ? AND user_id = ?').all(groupId, userId)
     .map((entry) => [entry.date, { status: entry.status, value: entry.value ?? undefined }]),
 );
+
+// «Поддержать»: one cheer per person per participant per goal within this window.
+const CHEER_COOLDOWN_MS = 20 * 60 * 60 * 1000;
+const cheerSince = () => new Date(Date.now() - CHEER_COOLDOWN_MS).toISOString();
+
+const getCheers = (goalId, toUser, currentUserId) => {
+  const since = cheerSince();
+  const stats = database.prepare(`
+    SELECT COUNT(*) AS total,
+           SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS recent,
+           SUM(CASE WHEN created_at >= ? AND from_user = ? THEN 1 ELSE 0 END) AS mine
+    FROM cheers WHERE goal_id = ? AND to_user = ?
+  `).get(since, since, currentUserId, goalId, toUser);
+  return { total: stats.total, recent: stats.recent || 0, byMe: Boolean(stats.mine) };
+};
 
 const serializeGoal = (row, user) => {
   const participants = database.prepare('SELECT user_id, first_name, photo_url, joined_at FROM participants WHERE goal_id = ? ORDER BY joined_at').all(row.id);
@@ -188,6 +265,7 @@ const serializeGoal = (row, user) => {
       photoUrl: participant.photo_url ?? undefined,
       joinedAt: participant.joined_at,
       entries: getEntries(row.id, participant.user_id),
+      cheers: getCheers(row.id, participant.user_id, user.id),
     })),
   };
 };
@@ -262,6 +340,71 @@ const normalizeCreatedAt = (value) => {
   return new Date().toISOString();
 };
 
+// --- Notifications (VK_SERVICE_KEY + the user's permission in VK) ---
+const getSettings = (userId) => database.prepare('SELECT notifications, tz_offset, last_reminded FROM user_settings WHERE user_id = ?').get(userId)
+  || { notifications: 0, tz_offset: 180, last_reminded: null };
+
+const keyAddDays = (key, days) => new Date(Date.parse(`${key}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+const keyWeekday = (key) => new Date(`${key}T00:00:00Z`).getUTCDay(); // 0 = Sunday
+
+/** Goals of the user that still expect a mark on `today` (the user's local date). Mirrors src/utils/goals.ts. */
+const countGoalsNeedingMark = (userId, today) => {
+  const rows = database.prepare("SELECT g.* FROM goals g JOIN participants p ON p.goal_id = g.id WHERE p.user_id = ? AND g.type != 'quantity'").all(userId);
+  return rows.filter((row) => {
+    const createdAt = row.created_at.slice(0, 10);
+    if (createdAt > today) return false;
+    if (row.duration > 0 && today > keyAddDays(createdAt, row.duration - 1)) return false; // finished
+    if (row.frequency === 'weekdays' && [0, 6].includes(keyWeekday(today))) return false; // day off
+    const entries = getEntries(row.id, userId);
+    if (entries[today]) return false; // already marked (done or skipped)
+    if (row.frequency === 'weekly') {
+      const weekStart = keyAddDays(today, -((keyWeekday(today) + 6) % 7));
+      const doneThisWeek = Array.from({ length: 7 }, (_, i) => keyAddDays(weekStart, i)).filter((key) => entries[key]?.status === 'done').length;
+      if (doneThisWeek >= (row.weekly_target || 1)) return false; // weekly norm met
+    }
+    return true;
+  }).length;
+};
+
+const pluralRu = (count, [one, few, many]) => {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+};
+
+const REMINDER_HOUR = 20; // local time
+/** Sends at most one evening reminder per user per local day, between 20:00 and 23:00 their time. */
+const runReminders = async () => {
+  if (!vk.enabled) return;
+  const users = database.prepare('SELECT user_id, tz_offset, last_reminded FROM user_settings WHERE notifications = 1').all();
+  for (const settings of users) {
+    const local = new Date(Date.now() + settings.tz_offset * 60_000);
+    const today = local.toISOString().slice(0, 10);
+    const hour = local.getUTCHours();
+    if (hour < REMINDER_HOUR || hour >= 23 || settings.last_reminded === today) continue;
+    database.prepare('UPDATE user_settings SET last_reminded = ? WHERE user_id = ?').run(today, settings.user_id);
+    const pending = countGoalsNeedingMark(settings.user_id, today);
+    if (!pending) continue;
+    try {
+      const words = pluralRu(pending, ['цель ждёт', 'цели ждут', 'целей ждут']);
+      await vk.sendNotification([settings.user_id], `Сегодня ${pending} ${words} отметки. Маленький шаг — тоже шаг!`, '/');
+    } catch (error) {
+      console.error('Reminder failed', error.message);
+    }
+  }
+};
+if (vk.enabled) setInterval(() => void runReminders(), Number(process.env.REMINDER_INTERVAL_MS || 5 * 60 * 1000)).unref();
+
+/** «Поддержать»: tell the recipient, if they allowed notifications. */
+const onCheer = (goalRow, fromUser, toUserId) => {
+  if (!vk.enabled || !getSettings(toUserId).notifications) return;
+  const name = getParticipant(goalRow.id, fromUser.id)?.first_name || 'Друг';
+  vk.sendNotification([toUserId], `${name} поддерживает вас в цели «${goalRow.title}» 👏`, `/goal/${goalRow.id}`)
+    .catch((error) => console.error('Cheer notification failed', error.message));
+};
+
 const server = http.createServer(async (request, response) => {
   if (request.method === 'OPTIONS') {
     json(response, 204, {});
@@ -278,6 +421,24 @@ const server = http.createServer(async (request, response) => {
 
     const parts = url.pathname.split('/').filter(Boolean);
     const user = getUser(request);
+
+    // Reminder settings. `available` tells the client whether the server can send notifications at all.
+    if (url.pathname === '/api/settings' && (request.method === 'GET' || request.method === 'PUT')) {
+      if (request.method === 'PUT') {
+        const { notifications, tzOffset } = await readBody(request);
+        const offset = Number(tzOffset);
+        if (typeof notifications !== 'boolean' || !Number.isInteger(offset) || offset < -720 || offset > 840) {
+          throw httpError(400, 'Некорректные настройки');
+        }
+        database.prepare(`
+          INSERT INTO user_settings (user_id, notifications, tz_offset) VALUES (?, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET notifications = excluded.notifications, tz_offset = excluded.tz_offset
+        `).run(user.id, notifications ? 1 : 0, offset);
+      }
+      const settings = getSettings(user.id);
+      json(response, 200, { available: vk.enabled, notifications: Boolean(settings.notifications), tzOffset: settings.tz_offset });
+      return;
+    }
 
     if (request.method === 'GET' && url.pathname === '/api/goals') {
       const rows = database.prepare('SELECT g.* FROM goals g JOIN participants p ON p.goal_id = g.id WHERE p.user_id = ? ORDER BY g.created_at DESC').all(user.id);
@@ -367,6 +528,23 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
+      // «Поддержать» another participant. Repeating within the cooldown is a no-op (no spam, no double count).
+      if (request.method === 'POST' && parts[3] === 'cheers') {
+        requireParticipant(groupId, user.id);
+        const { to } = await readBody(request);
+        if (typeof to !== 'string' || to === user.id) throw httpError(400, 'Поддержать можно только другого участника');
+        if (!getParticipant(groupId, to)) throw httpError(404, 'Участник не найден');
+        const already = database.prepare('SELECT 1 FROM cheers WHERE goal_id = ? AND from_user = ? AND to_user = ? AND created_at >= ?')
+          .get(groupId, user.id, to, cheerSince());
+        if (!already) {
+          database.prepare('INSERT INTO cheers (goal_id, from_user, to_user, created_at) VALUES (?, ?, ?, ?)')
+            .run(groupId, user.id, to, new Date().toISOString());
+          onCheer(row, user, to);
+        }
+        json(response, 200, serializeGoal(row, user));
+        return;
+      }
+
       // Clear the user's mark (or the accumulated value) for one day.
       if (request.method === 'DELETE' && parts[3] === 'entries' && parts[4]) {
         requireParticipant(groupId, user.id);
@@ -414,6 +592,7 @@ const server = http.createServer(async (request, response) => {
         } else {
           database.transaction(() => {
             database.prepare('DELETE FROM entries WHERE goal_id = ? AND user_id = ?').run(groupId, user.id);
+            database.prepare('DELETE FROM cheers WHERE goal_id = ? AND (from_user = ? OR to_user = ?)').run(groupId, user.id, user.id);
             database.prepare('DELETE FROM participants WHERE goal_id = ? AND user_id = ?').run(groupId, user.id);
           })();
         }

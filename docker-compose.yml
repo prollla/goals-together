@@ -10,10 +10,16 @@ services:
       PORT: 3001
       DATABASE_PATH: /data/goals.db
       VK_APP_SECRET: ${VK_APP_SECRET:?Set VK_APP_SECRET in .env}
+      # Optional: VK service key enables verified names/avatars and notifications (reminders, cheers).
+      VK_SERVICE_KEY: ${VK_SERVICE_KEY:-}
+      # Daily database backups, newest 14 kept, in ./backups on the host.
+      BACKUP_DIR: /backups
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
     ports:
       - "127.0.0.1:3001:3001"
     volumes:
       - goals-db:/data
+      - ./backups:/backups
     tmpfs:
       - /tmp
     security_opt:

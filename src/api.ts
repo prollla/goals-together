@@ -1,5 +1,5 @@
 import { UserInfo } from '@vkontakte/vk-bridge';
-import { Goal, GoalDraft, GoalEntry } from './types';
+import { Goal, GoalDraft, GoalEntry, ReminderSettings } from './types';
 
 const DEFAULT_API_URL = import.meta.env.DEV ? 'http://127.0.0.1:3001' : 'https://94.228.170.88.sslip.io';
 
@@ -62,6 +62,18 @@ export const updateGoalOnServer = (id: string, draft: GoalDraft, user?: UserInfo
 
 export const clearEntry = (id: string, date: string, user?: UserInfo) =>
   request<Goal>(`/api/goals/${id}/entries/${date}`, user, { method: 'DELETE' });
+
+export const cheerParticipant = (id: string, to: string, user?: UserInfo) =>
+  request<Goal>(`/api/goals/${id}/cheers`, user, { method: 'POST', body: JSON.stringify({ to }) });
+
+export const getReminderSettings = (user?: UserInfo) => request<ReminderSettings>('/api/settings', user);
+
+export const saveReminderSettings = (notifications: boolean, user?: UserInfo) =>
+  request<ReminderSettings>('/api/settings', user, {
+    method: 'PUT',
+    // Minutes east of UTC, so the server can send the reminder at 20:00 local time.
+    body: JSON.stringify({ notifications, tzOffset: -new Date().getTimezoneOffset() }),
+  });
 
 export const joinSharedGoal = (groupId: string, user?: UserInfo) =>
   request<Goal>(`/api/goals/${groupId}/join`, user, { method: 'POST' });

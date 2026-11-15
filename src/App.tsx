@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import {
-  Cell, Group as VKGroup, Panel, ScreenSpinner, Snackbar, SplitCol, SplitLayout, Tabbar, TabbarItem, View,
+  Cell, Div, Group as VKGroup, Panel, ScreenSpinner, Snackbar, SplitCol, SplitLayout, Tabbar, TabbarItem, View,
   useAdaptivityWithJSMediaQueries,
 } from '@vkontakte/vkui';
 import { Icon28HomeOutline, Icon28ListOutline, Icon28Users3Outline } from '@vkontakte/icons';
@@ -12,6 +12,7 @@ import { useGoals } from './hooks/useGoals';
 import { GoalDraft, GoalTemplate } from './types';
 import { clearGoalInvite, parseGoalInvite } from './utils/invite';
 import { getApiUserId, isVkLaunch } from './api';
+import { RemindersCard } from './components/RemindersCard';
 
 const NAV_ITEMS = [
   { panel: DEFAULT_VIEW_PANELS.HOME, path: '/', label: 'Сегодня', icon: <Icon28HomeOutline /> },
@@ -26,7 +27,7 @@ export const App = () => {
   const [fetchedUser, setUser] = useState<UserInfo | undefined>();
   // Inside VK, wait for the profile before talking to the API (outside VK there is nothing to wait for).
   const [profileReady, setProfileReady] = useState(() => !isVkLaunch());
-  const { goals, createGoal, updateGoal, joinShared, deleteGoal, markGoal, addValue, resetDay, serverError, loaded } = useGoals(fetchedUser, profileReady);
+  const { goals, createGoal, updateGoal, joinShared, deleteGoal, markGoal, addValue, resetDay, cheer, serverError, loaded } = useGoals(fetchedUser, profileReady);
   const goalActions = { onMark: markGoal, onAddValue: addValue, onResetDay: resetDay };
   const [popout, setPopout] = useState<ReactNode | null>(<ScreenSpinner />);
   const [selectedTemplate, setSelectedTemplate] = useState<GoalTemplate | undefined>();
@@ -145,9 +146,18 @@ export const App = () => {
         className={showTabbar ? 'app-with-tabbar' : ''}
       >
         <View activePanel={activePanel}>
-          <Home id={DEFAULT_VIEW_PANELS.HOME} fetchedUser={fetchedUser} goals={goals} serverError={serverError} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} {...goalActions} />
+          <Home
+            id={DEFAULT_VIEW_PANELS.HOME}
+            fetchedUser={fetchedUser}
+            goals={goals}
+            serverError={serverError}
+            onOpenGoal={openGoal}
+            onCreateGoal={openCustomGoal}
+            reminders={<Div><RemindersCard user={fetchedUser} ready={profileReady} onNotice={setNotice} /></Div>}
+            {...goalActions}
+          />
           <Goals id={DEFAULT_VIEW_PANELS.GOALS} goals={goals} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} {...goalActions} />
-          <Group id={DEFAULT_VIEW_PANELS.GROUP} goals={goals} fetchedUser={fetchedUser} onCreateGoal={openCustomGoal} serverError={serverError} onNotice={setNotice} />
+          <Group id={DEFAULT_VIEW_PANELS.GROUP} goals={goals} fetchedUser={fetchedUser} onCreateGoal={openCustomGoal} serverError={serverError} onNotice={setNotice} onCheer={cheer} />
           <Catalog id={DEFAULT_VIEW_PANELS.CATALOG} onSelect={selectTemplate} />
           <CreateGoal key={selectedTemplate?.id || 'custom'} id={DEFAULT_VIEW_PANELS.CREATE} template={selectedTemplate} onCreate={submitGoal} />
           <GoalDetails

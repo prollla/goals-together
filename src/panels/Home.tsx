@@ -1,4 +1,4 @@
-import { CSSProperties } from 'react';
+import { CSSProperties, ReactNode } from 'react';
 import { Avatar, Button, Caption, Div, Group, Header, Panel, PanelHeader, Text, Title } from '@vkontakte/vkui';
 import { Icon28AddOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { UserInfo } from '@vkontakte/vk-bridge';
@@ -13,9 +13,11 @@ interface HomeProps extends NavIdProps, GoalActions {
   serverError?: string;
   onOpenGoal: (id: string) => void;
   onCreateGoal: () => void;
+  /** Reminders toggle card (rendered by the app, hidden when notifications are unavailable). */
+  reminders?: ReactNode;
 }
 
-export const Home = ({ id, fetchedUser, goals: allGoals, serverError, onOpenGoal, onCreateGoal, onMark, onAddValue, onResetDay }: HomeProps) => {
+export const Home = ({ id, fetchedUser, goals: allGoals, serverError, onOpenGoal, onCreateGoal, onMark, onAddValue, onResetDay, reminders }: HomeProps) => {
   const routeNavigator = useRouteNavigator();
   // Today's focus: goals that expect a mark today (not finished, not a day off of a «По будням» goal).
   const goals = allGoals.filter(isPlannedToday);
@@ -90,6 +92,7 @@ export const Home = ({ id, fetchedUser, goals: allGoals, serverError, onOpenGoal
       </Group>
 
       <Group mode="plain">
+        {reminders}
         <Div>
           <button type="button" className="support-card" onClick={() => routeNavigator.push('/group')}>
             <span className="support-card__icon"><Icon28Users3Outline /></span>

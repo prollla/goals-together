@@ -9,9 +9,10 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "server": "node server/index.cjs",
-    "test": "npm run test:logic && npm run test:api",
+    "test": "npm run test:logic && npm run test:api && npm run test:social",
     "test:logic": "esbuild tests/goals-logic.test.ts --bundle --platform=node --outfile=.tmp/goals-logic.test.cjs --log-level=warning && node .tmp/goals-logic.test.cjs",
     "test:api": "node tests/api.test.cjs",
+    "test:social": "node tests/social.test.cjs",
     "deploy": "vite build && vk-miniapps-deploy"
   },
   "dependencies": {

@@ -10,8 +10,8 @@ FROM node:22-bookworm-slim
 WORKDIR /app
 COPY package.json ./
 COPY --from=dependencies /app/node_modules ./node_modules
-COPY server/index.cjs ./server/index.cjs
-RUN mkdir -p /data && chown node:node /data
+COPY server/*.cjs ./server/
+RUN mkdir -p /data /backups && chown node:node /data /backups
 
 ENV NODE_ENV=production
 ENV PORT=3001

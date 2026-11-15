@@ -1130,6 +1130,12 @@ button.calendar-day {
   gap: 8px;
 }
 
+/* Status and summary share a line when there is room and wrap (instead of truncating) next to the cheer button. */
+.member-row__bottom {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
 .member-row__name {
   overflow: hidden;
   font-size: 15px;
@@ -1160,12 +1166,84 @@ button.calendar-day {
 }
 
 .member-row__summary {
-  overflow: hidden;
   color: var(--vkui--color_text_secondary);
   font-size: 13px;
-  text-align: right;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.reminders-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--vkui--color_separator_primary);
+  border-radius: 18px;
+  background: var(--vkui--color_background_content);
+}
+
+.reminders-card__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.reminders-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.reminders-card__body strong {
+  font-size: 15px;
+}
+
+.reminders-card__body small {
+  color: var(--vkui--color_text_secondary);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.member-row__cheered {
+  color: var(--goal-accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cheer-button {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 76px;
+  margin-top: 2px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--goal-accent) 35%, transparent);
+  border-radius: 12px;
+  color: var(--goal-accent);
+  background: color-mix(in srgb, var(--goal-accent) 8%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cheer-button__icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.cheer-button--sent {
+  border-color: transparent;
+  color: var(--vkui--color_text_secondary);
+  background: var(--vkui--color_background_secondary);
+  cursor: default;
 }
 
 .shared-goal__invite-hint {

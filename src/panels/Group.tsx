@@ -13,10 +13,11 @@ interface GroupProps extends NavIdProps {
   onCreateGoal: () => void;
   serverError: string;
   onNotice: (message: string) => void;
+  onCheer: (goalId: string, userId: string) => void;
 }
 
 // Own class names on every text node: VKUI 8 typography classes are internal (vkuiTitle__level1 …) and not stable.
-export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNotice: setNotice }: GroupProps) => {
+export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNotice: setNotice, onCheer }: GroupProps) => {
   const sharedGoals = goals.filter((goal) => goal.privacy === 'group');
   const currentUserId = getApiUserId(fetchedUser);
   const today = toDateKey();
@@ -124,7 +125,24 @@ export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNot
                               </span>
                               <span className="member-row__summary">{participantSummary(goal, participant)}</span>
                             </div>
+                            {isMe && (participant.cheers?.recent || 0) > 0 && (
+                              <span className="member-row__cheered">
+                                👏 Вас {plural(participant.cheers?.recent || 0, ['поддержал', 'поддержали', 'поддержали'])} {participant.cheers?.recent} {plural(participant.cheers?.recent || 0, ['участник', 'участника', 'участников'])}
+                              </span>
+                            )}
                           </div>
+                          {!isMe && (
+                            <button
+                              type="button"
+                              className={`cheer-button ${participant.cheers?.byMe ? 'cheer-button--sent' : ''}`}
+                              disabled={participant.cheers?.byMe}
+                              aria-label={participant.cheers?.byMe ? `Вы уже поддержали: ${participant.firstName}` : `Поддержать: ${participant.firstName}`}
+                              onClick={() => onCheer(goal.id, participant.userId)}
+                            >
+                              <span className="cheer-button__icon" aria-hidden>👏</span>
+                              <span>{participant.cheers?.byMe ? 'Готово' : 'Поддержать'}</span>
+                            </button>
+                          )}
                         </li>
                       );
                     })}

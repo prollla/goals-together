@@ -26,3 +26,5 @@ jobs:
         run: npm run test:logic
       - name: API tests
         run: npm run test:api
+      - name: Cheers, VK notifications and backups tests
+        run: npm run test:social
