@@ -6,3 +6,5 @@ export { GoalDetails } from './GoalDetails';
 export { Group } from './Group';
 export { JoinGoal } from './JoinGoal';
 export { EditGoal } from './EditGoal';
+export { Achievements } from './Achievements';
+export { About } from './About';

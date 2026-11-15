@@ -1,10 +1,10 @@
 import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import { Avatar, Button, Div, Group as VKGroup, Header, IconButton, Panel, PanelHeader, Progress } from '@vkontakte/vkui';
-import { Icon20Check, Icon24ShareOutline, Icon28AddOutline, Icon28ShareOutline, Icon28Users3Outline } from '@vkontakte/icons';
+import { Icon20Check, Icon24ShareOutline, Icon24UserAddOutline, Icon28AddOutline, Icon28ShareOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { Goal, GoalParticipant, NavIdProps } from '../types';
 import { formatNumber, formatStreakUnit, getCurrentValue, getDoneDays, getProgress, getStreak, isDone, plural, toDateKey } from '../utils/goals';
-import { createGoalInviteLink } from '../utils/invite';
-import { getApiUserId } from '../api';
+import { createGoalInviteLink, goalRequestKey } from '../utils/invite';
+import { getApiUserId, isVkLaunch } from '../api';
 import { GoalTypeIcon } from '../components/GoalTypeIcon';
 
 interface GroupProps extends NavIdProps {
@@ -38,7 +38,26 @@ export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNot
     }
   };
 
-  const participantSummary = (goal: Goal, participant: GoalParticipant) => {
+  const inVk = isVkLaunch();
+
+  // VK-native invite: pick a friend, send them an app request that opens this goal's invitation.
+  const inviteFriend = async (goal: Goal) => {
+    try {
+      const { users } = await bridge.send('VKWebAppGetFriends', { multi: false });
+      const friend = users[0];
+      if (!friend) return;
+      await bridge.send('VKWebAppShowRequestBox', {
+        uid: friend.id,
+        message: `Присоединяйся к моей цели «${goal.title}» — будем поддерживать друг друга!`,
+        requestKey: goalRequestKey(goal.id),
+      });
+      setNotice(`Приглашение отправлено: ${friend.first_name}`);
+    } catch {
+      // The user closed the picker or the request box: nothing to report.
+    }
+  };
+
+  const participantSummary =(goal: Goal, participant: GoalParticipant) => {
     const participantGoal = { ...goal, entries: participant.entries };
     if (goal.type === 'quantity') {
       return `${formatNumber(getCurrentValue(participantGoal))} из ${formatNumber(goal.target || 0)} ${goal.unit || ''}`.trim();
@@ -95,7 +114,12 @@ export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNot
                         {count} {plural(count, ['участник', 'участника', 'участников'])} · сегодня {doneToday} из {count}
                       </span>
                     </div>
-                    <IconButton label="Пригласить в эту цель" onClick={() => share(goal)} className="shared-goal__share">
+                    {inVk && (
+                      <IconButton label="Пригласить друга из VK" onClick={() => void inviteFriend(goal)} className="shared-goal__share">
+                        <Icon24UserAddOutline />
+                      </IconButton>
+                    )}
+                    <IconButton label="Поделиться ссылкой на цель" onClick={() => share(goal)} className="shared-goal__share">
                       <Icon24ShareOutline />
                     </IconButton>
                   </header>

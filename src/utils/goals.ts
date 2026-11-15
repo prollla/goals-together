@@ -99,6 +99,38 @@ const getWeekStreak = (goal: Goal) => {
 
 export const getStreak = (goal: Goal) => (goal.frequency === 'weekly' && goal.type !== 'quantity' ? getWeekStreak(goal) : getDayStreak(goal));
 
+/** Longest streak in the whole history, with the same rules as getStreak (days or weeks). */
+export const getBestStreak = (goal: Goal) => {
+  const today = todayKey();
+  let best = 0;
+  let current = 0;
+  if (goal.frequency === 'weekly' && goal.type !== 'quantity') {
+    const target = goal.weeklyTarget || 1;
+    const thisWeek = weekStartKey(today);
+    for (let week = weekStartKey(goal.createdAt), guard = 0; week <= thisWeek && guard < 600; week = addDays(week, 7), guard += 1) {
+      if (doneInWeek(goal, week) >= target) best = Math.max(best, ++current);
+      else if (week !== thisWeek) current = 0;
+    }
+    return best;
+  }
+  let skipsInRow = 0;
+  for (let key = goal.createdAt, guard = 0; key <= today && guard < 4000; key = addDays(key, 1), guard += 1) {
+    if (!isScheduledDay(goal, key)) continue;
+    const status = goal.entries[key]?.status;
+    if (status === 'done') {
+      best = Math.max(best, ++current);
+      skipsInRow = 0;
+    } else if (status === 'skipped') {
+      skipsInRow += 1;
+      if (skipsInRow >= MAX_SKIPS_IN_ROW) { current = 0; skipsInRow = 0; }
+    } else if (key !== today) {
+      current = 0;
+      skipsInRow = 0;
+    }
+  }
+  return best;
+};
+
 export const plural = (count: number, [one, few, many]: [string, string, string]) => {
   const mod10 = Math.abs(count) % 10;
   const mod100 = Math.abs(count) % 100;

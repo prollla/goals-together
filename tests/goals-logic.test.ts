@@ -12,6 +12,7 @@ class FixedDate extends RealDate {
 
 import type { Goal } from '../src/types';
 import * as g from '../src/utils/goals';
+import * as ach from '../src/utils/achievements';
 
 let failures = 0;
 const check = (name: string, actual: unknown, expected: unknown) => {
@@ -75,6 +76,39 @@ check('not completed: deadline ahead', g.isCompleted(goal({ duration: 30, create
 check('completed: quantity target reached', g.isCompleted(goal({ type: 'quantity', target: 10, entries: { '2026-11-16': { status: 'done', value: 12 } } })), true);
 check('planned today: weekdays goal on Monday', g.isPlannedToday(goal(weekdays)), true);
 check('end date of 7-day goal', g.getEndDate(goal({ duration: 7, createdAt: '2026-11-01' })), '2026-11-07');
+
+// --- best streak over the whole history ---
+const days = (from: string, count: number, status = done) =>
+  Object.fromEntries(Array.from({ length: count }, (_, i) => [g.addDays(from, i), status]));
+check('best streak: old 5-day run beats current 2', g.getBestStreak(goal({ entries: { ...days('2026-10-01', 5), ...days('2026-11-14', 2) } })), 5);
+check('best streak: 2 skips inside a run are passed over', g.getBestStreak(goal({ entries: {
+  ...days('2026-10-01', 3), ...days('2026-10-04', 2, skip), ...days('2026-10-06', 3),
+} })), 6);
+check('best streak: 3 skips break it', g.getBestStreak(goal({ entries: {
+  ...days('2026-10-01', 3), ...days('2026-10-04', 3, skip), ...days('2026-10-07', 2),
+} })), 3);
+check('best streak: weekdays ignore weekends (Mon 2 Nov .. Fri 13 Nov workdays)', g.getBestStreak(goal({ ...weekdays, createdAt: '2026-11-01', entries: {
+  ...days('2026-11-02', 5), ...days('2026-11-09', 5),
+} })), 10);
+check('best streak: weekly goal in weeks', g.getBestStreak(goal({ ...weekly, entries: {
+  '2026-10-20': done, '2026-10-22': done, '2026-10-27': done, '2026-10-29': done, '2026-11-03': done,
+} })), 2);
+
+// --- achievements ---
+const unlockedIds = (goals: Goal[], me = '1') => ach.getAchievements(goals, me).filter((a) => a.unlocked).map((a) => a.id);
+check('achievements: nothing for an empty account', unlockedIds([]), []);
+check('achievements: first step', unlockedIds([goal({ entries: { '2026-11-16': done } })]), ['first-step']);
+check('achievements: 7-day streak', unlockedIds([goal({ entries: days('2026-11-01', 7) })]).includes('week-streak'), true);
+check('achievements: team needs a friend', unlockedIds([goal({ privacy: 'group', participants: [
+  { userId: '1', firstName: 'Я', joinedAt: '', entries: {} }, { userId: '2', firstName: 'Друг', joinedAt: '', entries: {} },
+] })]).includes('team'), true);
+check('achievements: supported counts cheers to me only', unlockedIds([goal({ privacy: 'group', participants: [
+  { userId: '1', firstName: 'Я', joinedAt: '', entries: {}, cheers: { total: 0, recent: 0, byMe: false } },
+  { userId: '2', firstName: 'Друг', joinedAt: '', entries: {}, cheers: { total: 3, recent: 1, byMe: true } },
+] })]).includes('supported'), false);
+check('achievements: goal reached at 100%', unlockedIds([goal({ type: 'quantity', target: 10, entries: { '2026-11-16': { status: 'done', value: 10 } } })]).includes('goal-reached'), true);
+const progressOf = ach.getAchievements([goal({ entries: days('2026-11-10', 4) })], '1').find((a) => a.id === 'week-streak');
+check('achievements: progress towards a locked one', progressOf && [progressOf.current, progressOf.target], [4, 7]);
 
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASSED');
 process.exit(failures ? 1 : 0);

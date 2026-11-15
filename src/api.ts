@@ -63,6 +63,9 @@ export const updateGoalOnServer = (id: string, draft: GoalDraft, user?: UserInfo
 export const clearEntry = (id: string, date: string, user?: UserInfo) =>
   request<Goal>(`/api/goals/${id}/entries/${date}`, user, { method: 'DELETE' });
 
+/** Erases all of the user's data on the server (shared goals they own pass to other participants). */
+export const deleteMyData = (user?: UserInfo) => request<{ ok: boolean }>('/api/me', user, { method: 'DELETE' });
+
 export const cheerParticipant = (id: string, to: string, user?: UserInfo) =>
   request<Goal>(`/api/goals/${id}/cheers`, user, { method: 'POST', body: JSON.stringify({ to }) });
 
@@ -87,5 +90,8 @@ export const updateSharedEntry = (groupId: string, date: string, status: 'done' 
 export const addSharedValue = (groupId: string, date: string, value: number, user?: UserInfo) =>
   request<Goal>(`/api/goals/${groupId}/entries`, user, { method: 'POST', body: JSON.stringify({ date, value }) });
 
-export const deleteSharedGoal = (groupId: string, user?: UserInfo) =>
-  request<{ ok: boolean; ownerDeleted: boolean }>(`/api/goals/${groupId}`, user, { method: 'DELETE' });
+/** transfer: the owner leaves and the goal passes to the earliest-joined participant instead of being deleted. */
+export const deleteSharedGoal = (groupId: string, user?: UserInfo, transfer = false) =>
+  request<{ ok: boolean; ownerDeleted: boolean; newOwner: { userId: string; firstName: string } | null }>(
+    `/api/goals/${groupId}${transfer ? '?transfer=1' : ''}`, user, { method: 'DELETE' },
+  );

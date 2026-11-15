@@ -1,12 +1,13 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 import {
   Cell, Div, Group as VKGroup, Panel, ScreenSpinner, Snackbar, SplitCol, SplitLayout, Tabbar, TabbarItem, View,
   useAdaptivityWithJSMediaQueries,
 } from '@vkontakte/vkui';
-import { Icon28HomeOutline, Icon28ListOutline, Icon28Users3Outline } from '@vkontakte/icons';
+import { Icon28FavoriteOutline, Icon28HomeOutline, Icon28InfoOutline, Icon28ListOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { useActiveVkuiLocation, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { Catalog, CreateGoal, EditGoal, GoalDetails, Goals, Group, Home, JoinGoal } from './panels';
+import { About, Achievements, Catalog, CreateGoal, EditGoal, GoalDetails, Goals, Group, Home, JoinGoal } from './panels';
+import { getAchievements, takeNewAchievements } from './utils/achievements';
 import { DEFAULT_VIEW_PANELS } from './routes';
 import { useGoals } from './hooks/useGoals';
 import { GoalDraft, GoalTemplate } from './types';
@@ -20,6 +21,12 @@ const NAV_ITEMS = [
   { panel: DEFAULT_VIEW_PANELS.GROUP, path: '/group', label: 'Группа', icon: <Icon28Users3Outline /> },
 ];
 
+// Desktop-only sidebar entries (on phones they are reached from the home screen).
+const SIDEBAR_EXTRA = [
+  { panel: DEFAULT_VIEW_PANELS.ACHIEVEMENTS, path: '/achievements', label: 'Достижения', icon: <Icon28FavoriteOutline /> },
+  { panel: DEFAULT_VIEW_PANELS.ABOUT, path: '/about', label: 'О приложении', icon: <Icon28InfoOutline /> },
+];
+
 export const App = () => {
   const { panel: activePanel = DEFAULT_VIEW_PANELS.HOME } = useActiveVkuiLocation();
   const routeNavigator = useRouteNavigator();
@@ -27,7 +34,9 @@ export const App = () => {
   const [fetchedUser, setUser] = useState<UserInfo | undefined>();
   // Inside VK, wait for the profile before talking to the API (outside VK there is nothing to wait for).
   const [profileReady, setProfileReady] = useState(() => !isVkLaunch());
-  const { goals, createGoal, updateGoal, joinShared, deleteGoal, markGoal, addValue, resetDay, cheer, serverError, loaded } = useGoals(fetchedUser, profileReady);
+  const { goals, createGoal, updateGoal, joinShared, deleteGoal, markGoal, addValue, resetDay, cheer, refresh, serverError, loaded } = useGoals(fetchedUser, profileReady);
+  const currentUserId = getApiUserId(fetchedUser);
+  const achievements = useMemo(() => getAchievements(goals, currentUserId), [goals, currentUserId]);
   const goalActions = { onMark: markGoal, onAddValue: addValue, onResetDay: resetDay };
   const [popout, setPopout] = useState<ReactNode | null>(<ScreenSpinner />);
   const [selectedTemplate, setSelectedTemplate] = useState<GoalTemplate | undefined>();
@@ -53,6 +62,13 @@ export const App = () => {
     };
     void fetchData();
   }, []);
+
+  // «Новое достижение» once the goals are loaded from the server (not on the empty initial state).
+  useEffect(() => {
+    if (!loaded) return;
+    const fresh = takeNewAchievements(achievements);
+    if (fresh.length) setNotice(`🏅 Новое достижение: ${fresh.map((achievement) => achievement.title).join(', ')}`);
+  }, [achievements, loaded]);
 
   useEffect(() => {
     if (inviteGroupId && activePanel !== DEFAULT_VIEW_PANELS.JOIN) {
@@ -114,10 +130,10 @@ export const App = () => {
     void routeNavigator.replace('/');
   };
 
-  const removeGoal = async (id: string) => {
+  const removeGoal = async (id: string, transfer = false) => {
     try {
-      await deleteGoal(id);
-      setNotice('Цель удалена');
+      const newOwner = await deleteGoal(id, transfer);
+      setNotice(newOwner ? `Вы вышли из цели. Теперь её автор — ${newOwner}` : 'Цель удалена');
       routeNavigator.push('/goals');
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Не удалось удалить цель');
@@ -154,6 +170,7 @@ export const App = () => {
             onOpenGoal={openGoal}
             onCreateGoal={openCustomGoal}
             reminders={<Div><RemindersCard user={fetchedUser} ready={profileReady} onNotice={setNotice} /></Div>}
+            achievements={achievements}
             {...goalActions}
           />
           <Goals id={DEFAULT_VIEW_PANELS.GOALS} goals={goals} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} {...goalActions} />
@@ -168,10 +185,18 @@ export const App = () => {
             onOpenGoal={openGoal}
             onEdit={(goalId) => routeNavigator.push(`/edit/${goalId}`)}
             onDelete={removeGoal}
+            onNotice={setNotice}
             {...goalActions}
           />
           <JoinGoal id={DEFAULT_VIEW_PANELS.JOIN} groupId={inviteGroupId} fetchedUser={fetchedUser} onAccept={acceptInvite} onDismiss={dismissInvite} />
           <EditGoal id={DEFAULT_VIEW_PANELS.EDIT} goals={goals} loading={!loaded} onSave={saveGoal} />
+          <Achievements id={DEFAULT_VIEW_PANELS.ACHIEVEMENTS} achievements={achievements} onNotice={setNotice} />
+          <About
+            id={DEFAULT_VIEW_PANELS.ABOUT}
+            user={fetchedUser}
+            onNotice={setNotice}
+            onDataDeleted={() => { void refresh(); void routeNavigator.replace('/'); }}
+          />
         </View>
         {showTabbar && (
           <Tabbar>
@@ -194,6 +219,19 @@ export const App = () => {
                   before={item.icon}
                   className={`sidebar__item ${activeSection === item.panel ? 'sidebar__item--active' : ''}`}
                   aria-current={activeSection === item.panel ? 'page' : undefined}
+                  onClick={() => routeNavigator.push(item.path)}
+                >
+                  {item.label}
+                </Cell>
+              ))}
+            </VKGroup>
+            <VKGroup>
+              {SIDEBAR_EXTRA.map((item) => (
+                <Cell
+                  key={item.panel}
+                  before={item.icon}
+                  className={`sidebar__item ${activePanel === item.panel ? 'sidebar__item--active' : ''}`}
+                  aria-current={activePanel === item.panel ? 'page' : undefined}
                   onClick={() => routeNavigator.push(item.path)}
                 >
                   {item.label}

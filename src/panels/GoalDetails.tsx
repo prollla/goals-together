@@ -6,9 +6,11 @@ import { useSafeBack } from '../hooks/useSafeBack';
 import { Goal, NavIdProps } from '../types';
 import {
   MAX_SKIPS_IN_ROW, dateFromKey, formatNumber, formatStreakUnit, getCurrentValue, getDoneDays, getEndDate, getProgress, getStreak,
-  isCompleted, isScheduledDay, plural, shiftDate, toDateKey, todayKey, yesterdayKey,
+  isCompleted, plural,
 } from '../utils/goals';
 import { GoalActions, GoalCard } from '../components/GoalCard';
+import { MonthCalendar } from '../components/MonthCalendar';
+import { shareStory } from '../utils/story';
 
 interface GoalDetailsProps extends NavIdProps, GoalActions {
   goals: Goal[];
@@ -16,7 +18,9 @@ interface GoalDetailsProps extends NavIdProps, GoalActions {
   currentUserId: string;
   onOpenGoal: (id: string) => void;
   onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
+  /** transfer: the owner leaves and the goal passes to another participant. */
+  onDelete: (id: string, transfer?: boolean) => void;
+  onNotice?: (message: string) => void;
 }
 
 const formatDate = (key: string) => new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(dateFromKey(key));
@@ -28,7 +32,7 @@ const scheduleText = (goal: Goal) => {
   return 'Каждый день';
 };
 
-export const GoalDetails = ({ id, goals, loading, currentUserId, onOpenGoal, onMark, onAddValue, onResetDay, onEdit, onDelete }: GoalDetailsProps) => {
+export const GoalDetails = ({ id, goals, loading, currentUserId, onOpenGoal, onMark, onAddValue, onResetDay, onEdit, onDelete, onNotice }: GoalDetailsProps) => {
   const goBack = useSafeBack();
   const params = useParams<'id'>();
   const [isDeleteOpen, setDeleteOpen] = useState(false);
@@ -43,7 +47,6 @@ export const GoalDetails = ({ id, goals, loading, currentUserId, onOpenGoal, onM
     );
   }
 
-  const days = Array.from({ length: 14 }, (_, index) => shiftDate(index - 13));
   const created = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).format(dateFromKey(goal.createdAt));
   const progress = getProgress(goal);
   const currentValue = getCurrentValue(goal);
@@ -51,15 +54,27 @@ export const GoalDetails = ({ id, goals, loading, currentUserId, onOpenGoal, onM
   const doneDays = getDoneDays(goal);
   const endDate = getEndDate(goal);
   const completed = isCompleted(goal);
-  const today = todayKey();
-  const yesterday = yesterdayKey();
   // Only the author edits a shared goal; a private goal always belongs to the current user.
   const canEdit = goal.privacy === 'private' || goal.ownerId === currentUserId;
   const canTapDays = goal.type !== 'quantity' && !completed;
+  const otherCount = (goal.participants || []).filter((participant) => participant.userId !== currentUserId).length;
+  // participant: leaves; owner-with-friends: passes the goal on or deletes it for all; sole: deletes.
+  const leaveRole = goal.privacy === 'group' && goal.ownerId !== currentUserId
+    ? 'participant'
+    : goal.privacy === 'group' && otherCount > 0 ? 'owner-with-friends' : 'sole';
 
   // Tap cycle for today/yesterday: empty → done → skipped → empty. Sending "skipped" replaces "done",
   // and sending it again on a skipped day clears the day (same toggle rule as the server).
   const cycleDay = (key: string) => onMark(goal.id, goal.entries[key] ? 'skipped' : 'done', key);
+
+  const shareStreak = async () => {
+    try {
+      const result = await shareStory({ emoji: '🔥', title: `Серия ${streak} ${formatStreakUnit(goal, streak)}`, subtitle: goal.title });
+      if (result === 'downloaded') onNotice?.('Картинка для истории сохранена');
+    } catch {
+      // The user closed the story editor: nothing to report.
+    }
+  };
 
   return (
     <Panel id={id}>
@@ -83,35 +98,16 @@ export const GoalDetails = ({ id, goals, loading, currentUserId, onOpenGoal, onM
           </div>
         </Div>
       </Group>
-      <Group mode="plain" header={<Header size="s">Последние 14 дней</Header>}>
+      {streak >= 3 && (
         <Div>
-          <div className="calendar-grid">
-            {days.map((day) => {
-              const key = toDateKey(day);
-              const status = goal.entries[key]?.status || 'empty';
-              const off = !isScheduledDay(goal, key) || key < goal.createdAt || key > today;
-              const tappable = canTapDays && !off && (key === today || key === yesterday);
-              const label = new Intl.DateTimeFormat('ru-RU', { weekday: 'narrow' }).format(day);
-              const className = `calendar-day calendar-day--${status} ${off ? 'calendar-day--off' : ''} ${tappable ? 'calendar-day--tappable' : ''} ${key === today ? 'calendar-day--today' : ''}`;
-              return tappable ? (
-                <button
-                  type="button"
-                  key={key}
-                  className={className}
-                  onClick={() => cycleDay(key)}
-                  aria-label={`${key === today ? 'Сегодня' : 'Вчера'}: ${status === 'done' ? 'выполнено' : status === 'skipped' ? 'пропуск' : 'нет отметки'}. Нажмите, чтобы изменить`}
-                >
-                  <Caption>{label}</Caption>
-                  <strong>{day.getDate()}</strong>
-                </button>
-              ) : (
-                <div key={key} className={className}>
-                  <Caption>{label}</Caption>
-                  <strong>{day.getDate()}</strong>
-                </div>
-              );
-            })}
-          </div>
+          <Button stretched size="m" mode="secondary" onClick={() => void shareStreak()}>
+            🔥 Поделиться серией в истории
+          </Button>
+        </Div>
+      )}
+      <Group mode="plain" header={<Header size="s">Календарь</Header>}>
+        <Div>
+          <MonthCalendar goal={goal} canTapDays={canTapDays} onCycleDay={cycleDay} />
           <div className="calendar-legend">
             <span><i className="legend-dot legend-dot--done" />Выполнено</span>
             <span><i className="legend-dot legend-dot--skipped" />Пропуск</span>
@@ -143,30 +139,39 @@ export const GoalDetails = ({ id, goals, loading, currentUserId, onOpenGoal, onM
             </Button>
           )}
           <Button className="delete-goal-button" stretched size="l" mode="tertiary" before={<Icon28DeleteOutline />} onClick={() => setDeleteOpen(true)}>
-            {goal.privacy === 'group' && goal.ownerId !== currentUserId ? 'Выйти из цели' : 'Удалить цель'}
+            {leaveRole === 'participant' ? 'Выйти из цели' : leaveRole === 'owner-with-friends' ? 'Выйти или удалить' : 'Удалить цель'}
           </Button>
         </Div>
       </Group>
       {isDeleteOpen && (
         <Alert
-          title={goal.privacy === 'group' && goal.ownerId !== currentUserId ? 'Выйти из цели?' : 'Удалить цель?'}
-          description={goal.privacy === 'group' && goal.ownerId !== currentUserId
-            ? 'Ваша история в этой цели будет удалена. Цель и прогресс остальных участников сохранятся.'
-            : goal.privacy === 'group' && (goal.participants?.length || 1) > 1
-              ? `Цель «${goal.title}» будет удалена у всех участников (${goal.participants?.length}) вместе с их прогрессом. Это действие нельзя отменить.`
-              : `«${goal.title}» и вся история прогресса будут удалены. Это действие нельзя отменить.`}
+          title={leaveRole === 'participant' ? 'Выйти из цели?' : leaveRole === 'owner-with-friends' ? 'Выйти из общей цели?' : 'Удалить цель?'}
+          description={{
+            participant: 'Ваша история в этой цели будет удалена. Цель и прогресс остальных участников сохранятся.',
+            'owner-with-friends': `Можно передать цель «${goal.title}» следующему участнику — у друзей сохранится прогресс. Или удалить её у всех участников — без возможности восстановления.`,
+            sole: `«${goal.title}» и вся история прогресса будут удалены. Это действие нельзя отменить.`,
+          }[leaveRole]}
           actionsLayout="vertical"
           actions={[
-            { title: 'Отмена', mode: 'cancel' },
+            ...(leaveRole === 'owner-with-friends' ? [{
+              title: 'Передать цель и выйти',
+              mode: 'default' as const,
+              autoCloseDisabled: true,
+              action: () => {
+                onDelete(goal.id, true);
+                setDeleteOpen(false);
+              },
+            }] : []),
             {
-              title: goal.privacy === 'group' && goal.ownerId !== currentUserId ? 'Выйти из цели' : 'Удалить цель',
-              mode: 'destructive',
+              title: leaveRole === 'participant' ? 'Выйти из цели' : leaveRole === 'owner-with-friends' ? 'Удалить у всех' : 'Удалить цель',
+              mode: 'destructive' as const,
               autoCloseDisabled: true,
               action: () => {
                 onDelete(goal.id);
                 setDeleteOpen(false);
               },
             },
+            { title: 'Отмена', mode: 'cancel' as const },
           ]}
           onClose={() => setDeleteOpen(false)}
           onClosed={() => setDeleteOpen(false)}

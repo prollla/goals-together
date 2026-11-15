@@ -6,6 +6,7 @@ import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Goal, NavIdProps } from '../types';
 import { formatToday, isHandledToday, isPlannedToday, plural } from '../utils/goals';
 import { GoalActions, GoalCard } from '../components/GoalCard';
+import { Achievement } from '../utils/achievements';
 
 interface HomeProps extends NavIdProps, GoalActions {
   fetchedUser?: UserInfo;
@@ -15,9 +16,11 @@ interface HomeProps extends NavIdProps, GoalActions {
   onCreateGoal: () => void;
   /** Reminders toggle card (rendered by the app, hidden when notifications are unavailable). */
   reminders?: ReactNode;
+  achievements: Achievement[];
 }
 
-export const Home = ({ id, fetchedUser, goals: allGoals, serverError, onOpenGoal, onCreateGoal, onMark, onAddValue, onResetDay, reminders }: HomeProps) => {
+export const Home = ({ id, fetchedUser, goals: allGoals, serverError, onOpenGoal, onCreateGoal, onMark, onAddValue, onResetDay, reminders, achievements }: HomeProps) => {
+  const unlockedAchievements = achievements.filter((achievement) => achievement.unlocked);
   const routeNavigator = useRouteNavigator();
   // Today's focus: goals that expect a mark today (not finished, not a day off of a «По будням» goal).
   const goals = allGoals.filter(isPlannedToday);
@@ -70,6 +73,18 @@ export const Home = ({ id, fetchedUser, goals: allGoals, serverError, onOpenGoal
         <Button stretched size="m" mode="secondary" onClick={() => routeNavigator.push('/catalog')}>Из шаблона</Button>
       </Div>
 
+      {allGoals.length > 0 && (
+        <Div>
+          <button type="button" className="achievements-strip" onClick={() => routeNavigator.push('/achievements')}>
+            <span className="achievements-strip__emojis" aria-hidden>
+              {unlockedAchievements.length ? unlockedAchievements.slice(-4).map((achievement) => achievement.emoji).join('') : '🏅'}
+            </span>
+            <span className="achievements-strip__text">Достижения</span>
+            <span className="achievements-strip__count">{unlockedAchievements.length} из {achievements.length} ›</span>
+          </button>
+        </Div>
+      )}
+
       <Group mode="plain" header={<Header size="s">Что отметить сегодня</Header>}>
         <Div className="goal-list">
           {goals.map((goal) => (
@@ -103,6 +118,9 @@ export const Home = ({ id, fetchedUser, goals: allGoals, serverError, onOpenGoal
             <span className="support-card__action">В группу</span>
           </button>
         </Div>
+        <div className="footer-links">
+          <Button size="s" mode="tertiary" appearance="neutral" onClick={() => routeNavigator.push('/about')}>О приложении и данных</Button>
+        </div>
       </Group>
     </Panel>
   );
