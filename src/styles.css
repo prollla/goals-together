@@ -751,6 +751,44 @@ button.calendar-day {
   text-underline-offset: 3px;
 }
 
+.month-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.month-calendar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.month-calendar__title {
+  font-size: 16px;
+}
+
+.month-calendar__weekday {
+  color: var(--vkui--color_text_secondary);
+  font-size: 11px;
+  text-align: center;
+}
+
+.month-calendar .calendar-day {
+  padding: 8px 0;
+}
+
+.month-calendar__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--vkui--color_text_secondary);
+  font-size: 13px;
+}
+
+.month-calendar__stats strong {
+  color: var(--vkui--color_text_primary);
+}
+
 .calendar-hint {
   display: block;
   margin-top: 8px;
@@ -1169,6 +1207,158 @@ button.calendar-day {
   color: var(--vkui--color_text_secondary);
   font-size: 13px;
   white-space: nowrap;
+}
+
+/* About / privacy */
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.about__section {
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--vkui--color_background_content);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.about__section h2,
+.about__section h3 {
+  margin: 0 0 6px;
+}
+
+.about__section h2 { font-size: 20px; }
+.about__section h3 { font-size: 16px; }
+
+.about__section p,
+.about__section ul {
+  margin: 0 0 8px;
+  color: var(--vkui--color_text_secondary);
+}
+
+.about__section ul {
+  padding-left: 20px;
+}
+
+.about__section a {
+  color: var(--brand);
+}
+
+.footer-links {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 12px;
+}
+
+/* Achievements */
+.achievements-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--vkui--color_separator_primary);
+  border-radius: 14px;
+  color: inherit;
+  background: var(--vkui--color_background_content);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.achievements-strip__emojis {
+  font-size: 20px;
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+
+.achievements-strip__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.achievements-strip__count {
+  color: var(--vkui--color_text_secondary);
+  font-size: 13px;
+}
+
+.achievements-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--vkui--color_background_content);
+}
+
+.achievements-summary strong {
+  font-size: 22px;
+}
+
+.achievements-summary span {
+  color: var(--vkui--color_text_secondary);
+  font-size: 14px;
+}
+
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.achievement {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border: 1px solid var(--vkui--color_separator_primary);
+  border-radius: 16px;
+  text-align: center;
+  background: var(--vkui--color_background_content);
+}
+
+.achievement__emoji {
+  font-size: 40px;
+  line-height: 1;
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+
+.achievement--unlocked .achievement__emoji {
+  filter: none;
+  opacity: 1;
+}
+
+.achievement--unlocked {
+  border-color: color-mix(in srgb, var(--brand) 35%, transparent);
+}
+
+.achievement__title {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.achievement__description {
+  flex: 1;
+  margin: 0;
+  color: var(--vkui--color_text_secondary);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.achievement__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  color: var(--vkui--color_text_secondary);
+  font-size: 12px;
 }
 
 .reminders-card {

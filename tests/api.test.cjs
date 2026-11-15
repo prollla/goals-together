@@ -150,6 +150,36 @@ const call = async (method, url, { launchParams, name, photo, body, raw } = {}) 
     check('migration drops future entries', !migrated.entries[shift(5)]);
     const future = (await call('POST', '/api/goals', { launchParams: alice, body: { title: 'F', type: 'regular', createdAt: shift(10) } })).data;
     check('future createdAt ignored', future.createdAt <= shift(1), future.createdAt);
+
+    // --- owner leaves with transfer: the goal passes to the earliest-joined participant ---
+    const carol = launch(303);
+    const passOn = (await call('POST', '/api/goals', { launchParams: alice, body: { title: 'Передать', type: 'regular', privacy: 'group' } })).data;
+    await call('POST', `/api/goals/${passOn.id}/join`, { launchParams: bob, name: 'Боб' });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await call('POST', `/api/goals/${passOn.id}/join`, { launchParams: carol, name: 'Кэрол' });
+    await call('PUT', `/api/goals/${passOn.id}/entries`, { launchParams: bob, body: { date: utcToday, status: 'done' } });
+    const transferred = await call('DELETE', `/api/goals/${passOn.id}?transfer=1`, { launchParams: alice });
+    check('transfer: owner leaves, goal kept', transferred.status === 200 && transferred.data.ownerDeleted === false && transferred.data.newOwner?.userId === '202', JSON.stringify(transferred.data));
+    const afterTransfer = (await call('GET', `/api/goals/${passOn.id}`, { launchParams: bob })).data;
+    check('transfer: bob is the new owner and keeps progress', afterTransfer.ownerId === '202' && afterTransfer.entries[utcToday]?.status === 'done');
+    check('transfer: alice is no longer a participant', !afterTransfer.participants.some((p) => p.userId === '101') && afterTransfer.participants.length === 2);
+    check('transfer: new owner can edit', (await call('PATCH', `/api/goals/${passOn.id}`, { launchParams: bob, body: { title: 'Передано' } })).status === 200);
+    const solo = (await call('POST', '/api/goals', { launchParams: alice, body: { title: 'Одна', type: 'regular', privacy: 'group' } })).data;
+    const soloDelete = await call('DELETE', `/api/goals/${solo.id}?transfer=1`, { launchParams: alice });
+    check('transfer with nobody else deletes the goal', soloDelete.data.ownerDeleted === true);
+
+    // --- «Удалить мои данные» ---
+    const dave = launch(404);
+    const daveShared = (await call('POST', '/api/goals', { launchParams: dave, body: { title: 'Дэйв и Боб', type: 'regular', privacy: 'group' } })).data;
+    await call('POST', `/api/goals/${daveShared.id}/join`, { launchParams: bob, name: 'Боб' });
+    await call('POST', '/api/goals', { launchParams: dave, body: { title: 'Личная Дэйва', type: 'regular', privacy: 'private' } });
+    await call('POST', `/api/goals/${daveShared.id}/cheers`, { launchParams: bob, body: { to: '404' } });
+    await call('PUT', '/api/settings', { launchParams: dave, body: { notifications: true, tzOffset: 180 } });
+    check('delete my data -> 200', (await call('DELETE', '/api/me', { launchParams: dave })).status === 200);
+    check('delete my data: no goals left for the user', (await call('GET', '/api/goals', { launchParams: dave })).data.length === 0);
+    const bobKeeps = (await call('GET', `/api/goals/${daveShared.id}`, { launchParams: bob })).data;
+    check('delete my data: shared goal passes to the friend', bobKeeps.ownerId === '202' && bobKeeps.participants.length === 1, JSON.stringify(bobKeeps?.participants));
+    check('delete my data: settings reset', (await call('GET', '/api/settings', { launchParams: dave })).data.notifications === false);
   } catch (error) {
     failures += 1;
     console.error('ERROR', error);

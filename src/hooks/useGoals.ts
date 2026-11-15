@@ -132,13 +132,15 @@ export const useGoals = (user?: UserInfo, ready = true) => {
     return goal;
   };
 
-  const deleteGoal = async (id: string) => {
+  /** Returns the new owner's name when the goal was passed on instead of deleted. */
+  const deleteGoal = async (id: string, transfer = false) => {
     if (isLocal(id)) {
       setLocalGoals((current) => current.filter((goal) => goal.id !== id));
-      return;
+      return null;
     }
-    await deleteSharedGoal(id, user);
+    const result = await deleteSharedGoal(id, user, transfer);
     setServerGoals((current) => current.filter((goal) => goal.id !== id));
+    return result.newOwner?.firstName ?? null;
   };
 
   const markGoal = (id: string, status: 'done' | 'skipped', date = toDateKey()) => {
@@ -159,6 +161,13 @@ export const useGoals = (user?: UserInfo, ready = true) => {
       return;
     }
     void addSharedValue(id, date, value, user).then(replace).catch(reportError);
+  };
+
+  /** Reload everything from the server (e.g. after «Удалить мои данные»); leftovers in local storage are dropped too. */
+  const refresh = async () => {
+    setLocalGoals([]);
+    localGoalsRef.current = [];
+    setServerGoals(await getGoals(user));
   };
 
   /** «Поддержать» another participant of a shared goal. */
@@ -189,6 +198,7 @@ export const useGoals = (user?: UserInfo, ready = true) => {
     addValue,
     resetDay,
     cheer,
+    refresh,
     serverError,
     loaded,
   };

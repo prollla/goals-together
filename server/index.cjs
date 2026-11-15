@@ -440,6 +440,31 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    // «Удалить мои данные»: every trace of the user is erased. Shared goals they own pass to the next participant,
+    // so friends keep their goals and progress; goals nobody else is in are deleted.
+    if (request.method === 'DELETE' && url.pathname === '/api/me') {
+      const memberships = database.prepare('SELECT g.id, g.owner_id FROM goals g JOIN participants p ON p.goal_id = g.id WHERE p.user_id = ?').all(user.id);
+      database.transaction(() => {
+        for (const goal of memberships) {
+          const successor = goal.owner_id === user.id
+            ? database.prepare('SELECT user_id FROM participants WHERE goal_id = ? AND user_id != ? ORDER BY joined_at LIMIT 1').get(goal.id, user.id)
+            : null;
+          if (goal.owner_id === user.id && !successor) {
+            database.prepare('DELETE FROM goals WHERE id = ?').run(goal.id);
+            continue;
+          }
+          if (successor) database.prepare('UPDATE goals SET owner_id = ? WHERE id = ?').run(successor.user_id, goal.id);
+          database.prepare('DELETE FROM entries WHERE goal_id = ? AND user_id = ?').run(goal.id, user.id);
+          database.prepare('DELETE FROM participants WHERE goal_id = ? AND user_id = ?').run(goal.id, user.id);
+        }
+        database.prepare('DELETE FROM cheers WHERE from_user = ? OR to_user = ?').run(user.id, user.id);
+        database.prepare('DELETE FROM user_settings WHERE user_id = ?').run(user.id);
+        database.prepare('DELETE FROM profiles WHERE user_id = ?').run(user.id);
+      })();
+      json(response, 200, { ok: true });
+      return;
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/goals') {
       const rows = database.prepare('SELECT g.* FROM goals g JOIN participants p ON p.goal_id = g.id WHERE p.user_id = ? ORDER BY g.created_at DESC').all(user.id);
       refreshProfile(user);
@@ -585,18 +610,30 @@ const server = http.createServer(async (request, response) => {
         return;
       }
 
+      // Leave or delete. The owner deletes the goal for everyone, unless ?transfer=1: then the goal passes to the
+      // participant who joined earliest and only the owner leaves (their friends keep the goal and progress).
       if (request.method === 'DELETE' && parts.length === 3) {
         requireParticipant(groupId, user.id);
-        if (row.owner_id === user.id) {
+        const isOwner = row.owner_id === user.id;
+        const successor = isOwner && url.searchParams.get('transfer') === '1'
+          ? database.prepare('SELECT user_id, first_name FROM participants WHERE goal_id = ? AND user_id != ? ORDER BY joined_at LIMIT 1').get(groupId, user.id)
+          : null;
+        if (isOwner && !successor) {
           database.prepare('DELETE FROM goals WHERE id = ?').run(groupId);
-        } else {
-          database.transaction(() => {
-            database.prepare('DELETE FROM entries WHERE goal_id = ? AND user_id = ?').run(groupId, user.id);
-            database.prepare('DELETE FROM cheers WHERE goal_id = ? AND (from_user = ? OR to_user = ?)').run(groupId, user.id, user.id);
-            database.prepare('DELETE FROM participants WHERE goal_id = ? AND user_id = ?').run(groupId, user.id);
-          })();
+          json(response, 200, { ok: true, ownerDeleted: true });
+          return;
         }
-        json(response, 200, { ok: true, ownerDeleted: row.owner_id === user.id });
+        database.transaction(() => {
+          if (successor) database.prepare('UPDATE goals SET owner_id = ? WHERE id = ?').run(successor.user_id, groupId);
+          database.prepare('DELETE FROM entries WHERE goal_id = ? AND user_id = ?').run(groupId, user.id);
+          database.prepare('DELETE FROM cheers WHERE goal_id = ? AND (from_user = ? OR to_user = ?)').run(groupId, user.id, user.id);
+          database.prepare('DELETE FROM participants WHERE goal_id = ? AND user_id = ?').run(groupId, user.id);
+        })();
+        if (successor && vk.enabled && getSettings(successor.user_id).notifications) {
+          vk.sendNotification([successor.user_id], `Теперь вы автор цели «${row.title}»: можно менять её и приглашать друзей`, `/goal/${groupId}`)
+            .catch((error) => console.error('Transfer notification failed', error.message));
+        }
+        json(response, 200, { ok: true, ownerDeleted: false, newOwner: successor ? { userId: successor.user_id, firstName: successor.first_name } : null });
         return;
       }
     }

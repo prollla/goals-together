@@ -12,6 +12,8 @@ export const DEFAULT_VIEW_PANELS = {
   GOAL: 'goal',
   JOIN: 'join',
   EDIT: 'edit',
+  ACHIEVEMENTS: 'achievements',
+  ABOUT: 'about',
 } as const;
 
 export const routes = RoutesConfig.create([
@@ -25,6 +27,8 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.GOAL, '/goal/:id', []),
       createPanel(DEFAULT_VIEW_PANELS.JOIN, '/join', []),
       createPanel(DEFAULT_VIEW_PANELS.EDIT, '/edit/:id', []),
+      createPanel(DEFAULT_VIEW_PANELS.ACHIEVEMENTS, '/achievements', []),
+      createPanel(DEFAULT_VIEW_PANELS.ABOUT, '/about', []),
     ]),
   ]),
 ]);
