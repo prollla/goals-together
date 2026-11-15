@@ -25,21 +25,31 @@ const loadGoals = () => {
   }
 };
 
-export const useGoals = (user?: UserInfo) => {
+/**
+ * @param ready false while the VK profile is still loading: no requests are sent until then,
+ * otherwise the server would receive requests without the real name and photo.
+ */
+export const useGoals = (user?: UserInfo, ready = true) => {
   const [localGoals, setLocalGoals] = useState<Goal[]>(loadGoals);
   const [sharedGoals, setSharedGoals] = useState<Goal[]>([]);
+  const [sharedLoaded, setSharedLoaded] = useState(false);
   const [serverError, setServerError] = useState('');
   const localGoalsRef = useRef(localGoals);
   localGoalsRef.current = localGoals;
+  // Shared between effect runs so a restarted effect never runs a second sync (and migration) in parallel.
+  const syncingRef = useRef(false);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(localGoals));
   }, [localGoals]);
 
   useEffect(() => {
+    if (!ready) return undefined;
     let active = true;
 
     const synchronize = async () => {
+      if (syncingRef.current) return;
+      syncingRef.current = true;
       try {
         const legacyGoals = localGoalsRef.current.filter((goal) => goal.privacy === 'group');
         for (const goal of legacyGoals) {
@@ -58,9 +68,9 @@ export const useGoals = (user?: UserInfo) => {
             groupId: goal.groupId,
           };
           await createSharedGoal(draft, user, goal.entries);
-        }
-        if (legacyGoals.length) {
-          setLocalGoals((current) => current.filter((goal) => goal.privacy === 'private'));
+          // Remove each migrated goal right away so a failure later in the loop cannot duplicate it.
+          localGoalsRef.current = localGoalsRef.current.filter((item) => item.id !== goal.id);
+          setLocalGoals((current) => current.filter((item) => item.id !== goal.id));
         }
         const remoteGoals = await getSharedGoals(user);
         if (active) {
@@ -69,6 +79,9 @@ export const useGoals = (user?: UserInfo) => {
         }
       } catch (error) {
         if (active) setServerError(error instanceof Error ? error.message : 'Сервер недоступен');
+      } finally {
+        syncingRef.current = false;
+        if (active) setSharedLoaded(true);
       }
     };
 
@@ -78,7 +91,7 @@ export const useGoals = (user?: UserInfo) => {
       active = false;
       window.clearInterval(interval);
     };
-  }, [user]);
+  }, [user, ready]);
 
   const createGoal = (draft: GoalDraft) => {
     const goal: Goal = {
@@ -167,5 +180,6 @@ export const useGoals = (user?: UserInfo) => {
     markGoal,
     addValue,
     serverError,
+    sharedLoaded,
   };
 };

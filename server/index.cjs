@@ -63,13 +63,22 @@ const json = (response, status, body) => {
   response.end(JSON.stringify(body));
 };
 
+const httpError = (status, message) => Object.assign(new Error(message), { status });
+
 const readBody = async (request) => {
   let body = '';
   for await (const chunk of request) {
     body += chunk;
-    if (body.length > 1_000_000) throw new Error('Request body is too large');
+    if (body.length > 100_000) throw httpError(413, 'Request body is too large');
   }
-  return body ? JSON.parse(body) : {};
+  if (!body) return {};
+  try {
+    const parsed = JSON.parse(body);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
+    return parsed;
+  } catch {
+    throw httpError(400, 'Invalid JSON');
+  }
 };
 
 const decodeHeader = (value, fallback = '') => {
@@ -81,33 +90,54 @@ const decodeHeader = (value, fallback = '') => {
   }
 };
 
+// Signed launch params older than this are rejected (vk_ts is the launch time, in seconds).
+const maxLaunchAgeSeconds = Number(process.env.MAX_LAUNCH_AGE_SECONDS || 3 * 24 * 60 * 60);
+
+// Algorithm from the VK docs: vk_* params sorted by key, values URL-encoded, HMAC-SHA256, base64url.
 const verifyLaunchParams = (search) => {
   const params = new URLSearchParams(search);
   const sign = params.get('sign');
   if (!sign || !appSecret) return null;
   const query = [...params.entries()]
     .filter(([key]) => key.startsWith('vk_'))
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, value]) => `${key}=${value}`)
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
     .join('&');
   const expected = crypto.createHmac('sha256', appSecret).update(query).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
   const left = Buffer.from(sign);
   const right = Buffer.from(expected);
   if (left.length !== right.length || !crypto.timingSafeEqual(left, right)) return null;
+  const launchedAt = Number(params.get('vk_ts'));
+  if (maxLaunchAgeSeconds > 0 && (!Number.isFinite(launchedAt) || Date.now() / 1000 - launchedAt > maxLaunchAgeSeconds)) return null;
   return params.get('vk_user_id');
+};
+
+// Only VK CDN avatars are stored, so a participant cannot make others' browsers load an arbitrary URL.
+const PHOTO_HOSTS = ['userapi.com', 'vk.com', 'vk.ru', 'vkuserphoto.ru', 'vkuser.net', 'mycdn.me'];
+const sanitizePhotoUrl = (value) => {
+  if (!value || value.length > 500) return null;
+  try {
+    const url = new URL(value);
+    const allowed = PHOTO_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
+    return url.protocol === 'https:' && allowed ? url.toString() : null;
+  } catch {
+    return null;
+  }
 };
 
 const getUser = (request) => {
   let userId = decodeHeader(request.headers['x-user-id'], '1');
   if (isProduction) {
     userId = verifyLaunchParams(request.headers['x-vk-launch-params'] || '');
-    if (!userId) throw Object.assign(new Error('Invalid VK launch parameters'), { status: 401 });
+    if (!userId) throw httpError(401, 'Invalid VK launch parameters');
   }
+  // null means "unknown": the stored profile is kept instead of being overwritten with a placeholder.
+  const firstName = decodeHeader(request.headers['x-user-name']).trim().slice(0, 80);
   return {
     id: String(userId),
-    firstName: decodeHeader(request.headers['x-user-name'], 'Пользователь').slice(0, 80),
-    photoUrl: decodeHeader(request.headers['x-user-photo']).slice(0, 500),
+    firstName: firstName || null,
+    photoUrl: sanitizePhotoUrl(decodeHeader(request.headers['x-user-photo'])),
   };
 };
 
@@ -157,14 +187,54 @@ const addParticipant = (groupId, user) => {
   database.prepare(`
     INSERT INTO participants (goal_id, user_id, first_name, photo_url, joined_at)
     VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(goal_id, user_id) DO UPDATE SET first_name = excluded.first_name, photo_url = excluded.photo_url
-  `).run(groupId, user.id, user.firstName, user.photoUrl, new Date().toISOString());
+    ON CONFLICT(goal_id, user_id) DO UPDATE SET
+      first_name = COALESCE(?, participants.first_name),
+      photo_url = COALESCE(?, participants.photo_url)
+  `).run(groupId, user.id, user.firstName || 'Участник', user.photoUrl, new Date().toISOString(), user.firstName, user.photoUrl);
 };
 
-const validateDraft = (draft) => {
-  if (!draft.title || !['quit', 'regular', 'quantity'].includes(draft.type)) {
-    throw Object.assign(new Error('Invalid goal'), { status: 400 });
+// One cheap UPDATE per poll instead of an upsert per goal; writes only when something actually changed.
+const refreshProfile = (user) => {
+  if (user.firstName) {
+    database.prepare('UPDATE participants SET first_name = ? WHERE user_id = ? AND first_name IS NOT ?').run(user.firstName, user.id, user.firstName);
   }
+  if (user.photoUrl) {
+    database.prepare('UPDATE participants SET photo_url = ? WHERE user_id = ? AND photo_url IS NOT ?').run(user.photoUrl, user.id, user.photoUrl);
+  }
+};
+
+const GOAL_TYPES = ['quit', 'regular', 'quantity'];
+const GOAL_CATEGORIES = ['Здоровье', 'Отказ', 'Развитие', 'Финансы и порядок'];
+const GOAL_COLORS = ['violet', 'green', 'orange', 'blue'];
+const GOAL_FREQUENCIES = ['daily', 'weekdays', 'weekly'];
+
+const optionalNumber = (value, isValid) => {
+  if (value === undefined || value === null || value === '') return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || !isValid(number)) throw httpError(400, 'Invalid goal');
+  return number;
+};
+
+// Returns a normalized draft or throws 400; nothing from the client reaches the database unchecked.
+const validateDraft = (draft) => {
+  const title = typeof draft.title === 'string' ? draft.title.trim().slice(0, 80) : '';
+  if (!title || !GOAL_TYPES.includes(draft.type)) throw httpError(400, 'Invalid goal');
+  const duration = optionalNumber(draft.duration, (n) => Number.isInteger(n) && n >= 0 && n <= 3650) ?? 0;
+  const frequency = GOAL_FREQUENCIES.includes(draft.frequency) ? draft.frequency : 'daily';
+  const target = draft.type === 'quantity' ? optionalNumber(draft.target, (n) => n > 0 && n <= 1e9) : null;
+  if (draft.type === 'quantity' && target === null) throw httpError(400, 'Invalid goal');
+  return {
+    title,
+    rule: typeof draft.rule === 'string' ? draft.rule.trim().slice(0, 180) : '',
+    category: GOAL_CATEGORIES.includes(draft.category) ? draft.category : 'Развитие',
+    type: draft.type,
+    color: GOAL_COLORS.includes(draft.color) ? draft.color : 'violet',
+    duration,
+    frequency,
+    weeklyTarget: frequency === 'weekly' ? optionalNumber(draft.weeklyTarget, (n) => Number.isInteger(n) && n >= 1 && n <= 7) : null,
+    target,
+    unit: draft.type === 'quantity' && typeof draft.unit === 'string' ? draft.unit.trim().slice(0, 16) || null : null,
+  };
 };
 
 const server = http.createServer(async (request, response) => {
@@ -186,16 +256,14 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === 'GET' && url.pathname === '/api/goals') {
       const rows = database.prepare('SELECT g.* FROM goals g JOIN participants p ON p.goal_id = g.id WHERE p.user_id = ? ORDER BY g.created_at DESC').all(user.id);
-      json(response, 200, rows.map((row) => {
-        addParticipant(row.id, user);
-        return serializeGoal(row, user);
-      }));
+      refreshProfile(user);
+      json(response, 200, rows.map((row) => serializeGoal(row, user)));
       return;
     }
 
     if (request.method === 'POST' && url.pathname === '/api/goals') {
-      const { entries, ...draft } = await readBody(request);
-      validateDraft(draft);
+      const { entries, ...body } = await readBody(request);
+      const draft = validateDraft(body);
       const groupId = crypto.randomUUID();
       const createdAt = new Date().toISOString();
       database.transaction(() => {
@@ -203,16 +271,14 @@ const server = http.createServer(async (request, response) => {
           INSERT INTO goals (id, owner_id, title, rule, category, type, color, created_at, duration, frequency, weekly_target, target, unit)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
-          groupId, user.id, draft.title.trim().slice(0, 80), (draft.rule || '').trim().slice(0, 180),
-          draft.category || 'Развитие', draft.type, draft.color || 'violet', createdAt,
-          Number(draft.duration || 0), draft.frequency || 'daily', draft.weeklyTarget ?? null,
-          draft.target ?? null, draft.unit ?? null,
+          groupId, user.id, draft.title, draft.rule, draft.category, draft.type, draft.color, createdAt,
+          draft.duration, draft.frequency, draft.weeklyTarget, draft.target, draft.unit,
         );
         addParticipant(groupId, user);
         if (entries && typeof entries === 'object') {
           const insertEntry = database.prepare('INSERT OR REPLACE INTO entries (goal_id, user_id, date, status, value, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
           Object.entries(entries).forEach(([date, entry]) => {
-            if (/^\d{4}-\d{2}-\d{2}$/.test(date) && ['done', 'skipped'].includes(entry.status)) {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(date) && entry && ['done', 'skipped'].includes(entry.status)) {
               insertEntry.run(groupId, user.id, date, entry.status, Number.isFinite(entry.value) ? entry.value : null, createdAt);
             }
           });
@@ -251,7 +317,6 @@ const server = http.createServer(async (request, response) => {
 
       if (request.method === 'GET' && parts.length === 3) {
         requireParticipant(groupId, user.id);
-        addParticipant(groupId, user);
         json(response, 200, serializeGoal(row, user));
         return;
       }
@@ -312,7 +377,13 @@ const server = http.createServer(async (request, response) => {
 
     json(response, 404, { error: 'Not found' });
   } catch (error) {
-    json(response, error.status || 400, { error: error.message || 'Request failed' });
+    if (error.status) {
+      json(response, error.status, { error: error.message });
+      return;
+    }
+    // Unexpected errors (SQL etc.) are logged, never sent to the client.
+    console.error(`${request.method} ${request.url}`, error);
+    json(response, 500, { error: 'Ошибка сервера. Попробуйте позже.' });
   }
 });
 

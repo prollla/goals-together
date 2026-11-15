@@ -1,35 +1,51 @@
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { Goal, GoalDraft, GoalEntry } from './types';
 
-const API_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://127.0.0.1:3001' : 'https://94.228.170.88.sslip.io')).replace(/\/$/, '');
+const DEFAULT_API_URL = import.meta.env.DEV ? 'http://127.0.0.1:3001' : 'https://94.228.170.88.sslip.io';
+
+// An empty, whitespace-only or "/" VITE_API_URL must never leave the app without an API address.
+const resolveApiUrl = () => {
+  const configured = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+  return /^https?:\/\//.test(configured) ? configured : DEFAULT_API_URL;
+};
+
+const API_URL = resolveApiUrl();
+
+export const isVkLaunch = () => new URLSearchParams(window.location.search).has('vk_app_id');
 
 export const getApiUserId = (user?: UserInfo) => {
   if (user) return String(user.id);
   const params = new URLSearchParams(window.location.search);
+  const vkUserId = params.get('vk_user_id');
+  if (vkUserId) return vkUserId;
   const requestedUser = params.get('dev_user');
   if (requestedUser) localStorage.setItem('goals-together-dev-user', requestedUser);
   return localStorage.getItem('goals-together-dev-user') || '1';
 };
 
-const getHeaders = (user?: UserInfo) => {
-  const userId = getApiUserId(user);
-  const firstName = user?.first_name || (userId === '1' ? 'Вы' : 'Друг');
-  return {
+const getHeaders = (user?: UserInfo): Record<string, string> => {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-User-Id': userId,
-    'X-User-Name': encodeURIComponent(firstName),
-    'X-User-Photo': encodeURIComponent(user?.photo_200 || ''),
+    'X-User-Id': getApiUserId(user),
     'X-VK-Launch-Params': window.location.search,
   };
+  // Profile headers are sent only when the real profile is known, so the server never stores placeholders.
+  if (user?.first_name) headers['X-User-Name'] = encodeURIComponent(user.first_name);
+  if (user?.photo_200) headers['X-User-Photo'] = encodeURIComponent(user.photo_200);
+  return headers;
 };
 
 const request = async <T>(path: string, user: UserInfo | undefined, options: RequestInit = {}): Promise<T> => {
-  if (!API_URL) throw new Error('Адрес API не настроен. Укажите VITE_API_URL.');
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: { ...getHeaders(user), ...options.headers },
-  });
-  const data = await response.json();
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: { ...getHeaders(user), ...options.headers },
+    });
+  } catch {
+    throw new Error('Сервер недоступен. Проверьте подключение к интернету.');
+  }
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'Не удалось связаться с сервером');
   return data as T;
 };

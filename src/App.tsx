@@ -8,21 +8,22 @@ import { DEFAULT_VIEW_PANELS } from './routes';
 import { useGoals } from './hooks/useGoals';
 import { GoalDraft, GoalTemplate } from './types';
 import { clearGoalInvite, parseGoalInvite } from './utils/invite';
-import { getApiUserId } from './api';
+import { getApiUserId, isVkLaunch } from './api';
 
 export const App = () => {
   const { panel: activePanel = DEFAULT_VIEW_PANELS.HOME } = useActiveVkuiLocation();
   const routeNavigator = useRouteNavigator();
   const [fetchedUser, setUser] = useState<UserInfo | undefined>();
-  const { goals, createGoal, createShared, joinShared, deleteGoal, markGoal, addValue, serverError } = useGoals(fetchedUser);
+  // Inside VK, wait for the profile before talking to the API (outside VK there is nothing to wait for).
+  const [profileReady, setProfileReady] = useState(() => !isVkLaunch());
+  const { goals, createGoal, createShared, joinShared, deleteGoal, markGoal, addValue, serverError, sharedLoaded } = useGoals(fetchedUser, profileReady);
   const [popout, setPopout] = useState<ReactNode | null>(<ScreenSpinner />);
   const [selectedTemplate, setSelectedTemplate] = useState<GoalTemplate | undefined>();
   const [inviteGroupId, setInviteGroupId] = useState<string | null>(() => parseGoalInvite(window.location.search));
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
-    const hasLaunchParams = new URLSearchParams(window.location.search).has('vk_app_id');
-    if (!hasLaunchParams) {
+    if (!isVkLaunch()) {
       setPopout(null);
       return;
     }
@@ -34,6 +35,7 @@ export const App = () => {
       } catch {
         setUser(undefined);
       } finally {
+        setProfileReady(true);
         setPopout(null);
       }
     };
@@ -70,9 +72,7 @@ export const App = () => {
     }
   };
 
-  const submitGoal = (draft: GoalDraft) => {
-    void addGoal(draft, 'Цель создана. Первый шаг можно отметить уже сегодня.');
-  };
+  const submitGoal = (draft: GoalDraft) => addGoal(draft, 'Цель создана. Первый шаг можно отметить уже сегодня.');
 
   const acceptInvite = async (groupId: string) => {
     try {
@@ -84,6 +84,12 @@ export const App = () => {
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Не удалось присоединиться к цели');
     }
+  };
+
+  const dismissInvite = () => {
+    clearGoalInvite();
+    setInviteGroupId(null);
+    void routeNavigator.replace('/');
   };
 
   const removeGoal = async (id: string) => {
@@ -108,8 +114,8 @@ export const App = () => {
           <Group id={DEFAULT_VIEW_PANELS.GROUP} goals={goals} fetchedUser={fetchedUser} onCreateGoal={openCustomGoal} serverError={serverError} />
           <Catalog id={DEFAULT_VIEW_PANELS.CATALOG} onSelect={selectTemplate} />
           <CreateGoal key={selectedTemplate?.id || 'custom'} id={DEFAULT_VIEW_PANELS.CREATE} template={selectedTemplate} onCreate={submitGoal} />
-          <GoalDetails id={DEFAULT_VIEW_PANELS.GOAL} goals={goals} currentUserId={getApiUserId(fetchedUser)} onOpenGoal={openGoal} onMark={markGoal} onAddValue={addValue} onDelete={removeGoal} />
-          <JoinGoal id={DEFAULT_VIEW_PANELS.JOIN} groupId={inviteGroupId} fetchedUser={fetchedUser} onAccept={acceptInvite} />
+          <GoalDetails id={DEFAULT_VIEW_PANELS.GOAL} goals={goals} loading={!sharedLoaded} currentUserId={getApiUserId(fetchedUser)} onOpenGoal={openGoal} onMark={markGoal} onAddValue={addValue} onDelete={removeGoal} />
+          <JoinGoal id={DEFAULT_VIEW_PANELS.JOIN} groupId={inviteGroupId} fetchedUser={fetchedUser} onAccept={acceptInvite} onDismiss={dismissInvite} />
         </View>
         {showTabbar && (
           <Tabbar>
