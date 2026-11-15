@@ -16,6 +16,7 @@ const typeOptions: { type: GoalType; title: string; subtitle: string }[] = [
 ];
 
 const colors: GoalColor[] = ['violet', 'green', 'orange', 'blue'];
+const colorNames: Record<GoalColor, string> = { violet: 'фиолетовый', green: 'зелёный', orange: 'оранжевый', blue: 'синий' };
 
 export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
   const goBack = useSafeBack();
@@ -137,7 +138,7 @@ export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
             <FormItem top="Цвет карточки">
               <div className="color-picker">
                 {colors.map((item) => (
-                  <button key={item} type="button" aria-label={`Выбрать ${item} цвет`} className={`color-dot color-dot--${item} ${color === item ? 'color-dot--active' : ''}`} onClick={() => setColor(item)} />
+                  <button key={item} type="button" aria-label={`Цвет: ${colorNames[item]}`} aria-pressed={color === item} className={`color-dot color-dot--${item} ${color === item ? 'color-dot--active' : ''}`} onClick={() => setColor(item)} />
                 ))}
               </div>
             </FormItem>

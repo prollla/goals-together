@@ -109,9 +109,9 @@ export const App = () => {
     <SplitLayout center>
       <SplitCol width="100%" maxWidth={760} className={showTabbar ? 'app-with-tabbar' : ''}>
         <View activePanel={activePanel}>
-          <Home id={DEFAULT_VIEW_PANELS.HOME} fetchedUser={fetchedUser} goals={goals} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} onMark={markGoal} onAddValue={addValue} />
+          <Home id={DEFAULT_VIEW_PANELS.HOME} fetchedUser={fetchedUser} goals={goals} serverError={serverError} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} onMark={markGoal} onAddValue={addValue} />
           <Goals id={DEFAULT_VIEW_PANELS.GOALS} goals={goals} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} onMark={markGoal} onAddValue={addValue} />
-          <Group id={DEFAULT_VIEW_PANELS.GROUP} goals={goals} fetchedUser={fetchedUser} onCreateGoal={openCustomGoal} serverError={serverError} />
+          <Group id={DEFAULT_VIEW_PANELS.GROUP} goals={goals} fetchedUser={fetchedUser} onCreateGoal={openCustomGoal} serverError={serverError} onNotice={setNotice} />
           <Catalog id={DEFAULT_VIEW_PANELS.CATALOG} onSelect={selectTemplate} />
           <CreateGoal key={selectedTemplate?.id || 'custom'} id={DEFAULT_VIEW_PANELS.CREATE} template={selectedTemplate} onCreate={submitGoal} />
           <GoalDetails id={DEFAULT_VIEW_PANELS.GOAL} goals={goals} loading={!sharedLoaded} currentUserId={getApiUserId(fetchedUser)} onOpenGoal={openGoal} onMark={markGoal} onAddValue={addValue} onDelete={removeGoal} />

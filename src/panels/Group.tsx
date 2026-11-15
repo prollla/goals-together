@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import bridge, { UserInfo } from '@vkontakte/vk-bridge';
-import { Avatar, Button, Caption, Div, Group as VKGroup, Header, Panel, PanelHeader, Progress, Snackbar, Text, Title } from '@vkontakte/vkui';
+import { Avatar, Button, Caption, Div, Group as VKGroup, Header, Panel, PanelHeader, Progress, Text, Title } from '@vkontakte/vkui';
 import { Icon28AddOutline, Icon28ShareOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { Goal, NavIdProps } from '../types';
 import { getDoneDays, getProgress, isDone, plural, toDateKey } from '../utils/goals';
@@ -12,10 +11,10 @@ interface GroupProps extends NavIdProps {
   fetchedUser?: UserInfo;
   onCreateGoal: () => void;
   serverError: string;
+  onNotice: (message: string) => void;
 }
 
-export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError }: GroupProps) => {
-  const [notice, setNotice] = useState('');
+export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNotice: setNotice }: GroupProps) => {
   const sharedGoals = goals.filter((goal) => goal.privacy === 'group');
   const currentUserId = getApiUserId(fetchedUser);
 
@@ -44,10 +43,13 @@ export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError }: Gro
           <Caption>ОДНА ЦЕЛЬ — СВОЙ ПРОГРЕСС</Caption>
           <Title level="1" weight="2">Видите результаты<br />и поддерживайте друг друга</Title>
           <Text>У каждого участника отдельные отметки и независимая история</Text>
-          {sharedGoals.length > 0 ? (
+          {/* With several goals the hero cannot know which one to share: each card has its own invite button. */}
+          {sharedGoals.length === 1 ? (
             <Button className="group-invite" size="l" mode="secondary" before={<Icon28ShareOutline />} onClick={() => share(sharedGoals[0])}>Пригласить друга</Button>
           ) : (
-            <Button className="group-invite" size="l" mode="secondary" before={<Icon28AddOutline />} onClick={onCreateGoal}>Создать общую цель</Button>
+            <Button className="group-invite" size="l" mode="secondary" before={<Icon28AddOutline />} onClick={onCreateGoal}>
+              {sharedGoals.length ? 'Новая общая цель' : 'Создать общую цель'}
+            </Button>
           )}
         </div>
       </Div>
@@ -95,7 +97,6 @@ export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError }: Gro
       <Div className="demo-note">
         <Text>Каждый отмечает только свой прогресс. Результаты участников обновляются автоматически.</Text>
       </Div>
-      {notice && <Snackbar duration={3000} onClose={() => setNotice('')} onClosed={() => setNotice('')}>{notice}</Snackbar>}
     </Panel>
   );
 };

@@ -5,6 +5,31 @@
   --brand-soft: #efecff;
   --mint: #2f9d75;
   --ink-muted: #737785;
+  --success-text: #278b69;
+  --success-strong: #217658;
+  --success-bg: #e5f6ef;
+  --warning-text: #76632e;
+  --warning-bg: #fff5d9;
+  --support-bg: #eff9f4;
+  --support-border: #dcefe6;
+  --support-icon-bg: #d9f1e5;
+  --support-caption: #517164;
+}
+
+/* VKUI 8 marks the dark theme with vkui--vkBase--dark (mobile) or vkui--vkCom--dark (vk.com). */
+.vkui--vkBase--dark,
+.vkui--vkCom--dark {
+  --brand: #9b88f2;
+  --brand-soft: #2f2850;
+  --success-text: #5cc79d;
+  --success-strong: #7dd8b3;
+  --success-bg: #1f3b30;
+  --warning-text: #f0cf7a;
+  --warning-bg: #3d3420;
+  --support-bg: #1d332a;
+  --support-border: #2c5646;
+  --support-icon-bg: #24493b;
+  --support-caption: #aacbbb;
 }
 
 body {
@@ -29,6 +54,15 @@ button:focus-visible {
 
 .app-with-tabbar .vkuiPanel__in {
   padding-bottom: 72px;
+}
+
+/* The tabbar is position: fixed; keep it as wide as the 760px content column on desktop. */
+.app-with-tabbar .vkuiTabbar__host {
+  left: 50%;
+  right: auto;
+  width: 100%;
+  max-width: 760px;
+  transform: translateX(-50%);
 }
 
 .welcome-block {
@@ -265,6 +299,47 @@ button:focus-visible {
   border-top: 1px solid var(--vkui--color_separator_primary);
 }
 
+/* Light theme: the main action takes the card's color (dark theme keeps VKUI's standard white button). */
+.vkui--vkBase--light .goal-card,
+.vkui--vkCom--light .goal-card {
+  --vkui--color_background_accent_themed: var(--goal-accent);
+  --vkui--color_background_accent_themed--hover: color-mix(in srgb, var(--goal-accent) 88%, #000);
+  --vkui--color_background_accent_themed--active: color-mix(in srgb, var(--goal-accent) 80%, #000);
+}
+
+.goal-card__status {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.goal-card__status--done {
+  color: var(--success-strong);
+  background: var(--success-bg);
+}
+
+.goal-card__skipped-note {
+  display: block;
+  margin-top: 8px;
+  color: var(--vkui--color_text_secondary);
+}
+
+.server-banner {
+  padding: 12px 14px;
+  border-radius: 14px;
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
 .goal-card__quantity {
   margin-top: 12px;
   padding-top: 12px;
@@ -290,11 +365,11 @@ button:focus-visible {
   gap: 12px;
   width: 100%;
   padding: 16px;
-  border: 1px solid #dcefe6;
+  border: 1px solid var(--support-border);
   border-radius: 18px;
   color: inherit;
   text-align: left;
-  background: #eff9f4;
+  background: var(--support-bg);
   cursor: pointer;
 }
 
@@ -305,8 +380,8 @@ button:focus-visible {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  color: #278b69;
-  background: #d9f1e5;
+  color: var(--success-text);
+  background: var(--support-icon-bg);
 }
 
 .support-card__body {
@@ -317,12 +392,12 @@ button:focus-visible {
 .support-card__body .vkuiCaption {
   display: block;
   margin-top: 4px;
-  color: #517164;
+  color: var(--support-caption);
   line-height: 1.35;
 }
 
 .support-card__action {
-  color: #278b69;
+  color: var(--success-text);
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
@@ -369,9 +444,9 @@ button:focus-visible {
 }
 
 .filter-chip.filter-chip--active {
-  border-color: #6750d8;
+  border-color: var(--brand);
   color: #fff;
-  background: #6750d8;
+  background: var(--brand);
 }
 
 .template-card {
@@ -545,12 +620,12 @@ button:focus-visible {
 }
 
 .calendar-day--done {
-  color: #278b69;
-  background: #e5f6ef;
+  color: var(--success-text);
+  background: var(--success-bg);
 }
 
 .calendar-day--done strong {
-  color: #217658;
+  color: var(--success-strong);
 }
 
 .calendar-day--skipped {
@@ -672,13 +747,13 @@ button:focus-visible {
 }
 
 .member-status--done {
-  color: #217658;
-  background: #e5f6ef;
+  color: var(--success-strong);
+  background: var(--success-bg);
 }
 
 .member-status--pending {
-  color: #76632e;
-  background: #fff5d9;
+  color: var(--warning-text);
+  background: var(--warning-bg);
 }
 
 .member-card > .vkuiCaption {
@@ -722,27 +797,35 @@ button:focus-visible {
   text-align: center;
 }
 
-.vkui--scheme_dark .support-card {
-  border-color: #2c5646;
-  background: #203e33;
+/* Dark theme: brighter accents for text contrast, translucent tints instead of pastel backgrounds. */
+.vkui--vkBase--dark .goal-card--violet, .vkui--vkCom--dark .goal-card--violet,
+.vkui--vkBase--dark .template-card--violet, .vkui--vkCom--dark .template-card--violet,
+.vkui--vkBase--dark .invite-goal, .vkui--vkCom--dark .invite-goal { --goal-accent: #9b88f2; }
+.vkui--vkBase--dark .goal-card--green, .vkui--vkCom--dark .goal-card--green,
+.vkui--vkBase--dark .template-card--green, .vkui--vkCom--dark .template-card--green,
+.vkui--vkBase--dark .invite-goal--green, .vkui--vkCom--dark .invite-goal--green { --goal-accent: #5cc79d; }
+.vkui--vkBase--dark .goal-card--orange, .vkui--vkCom--dark .goal-card--orange,
+.vkui--vkBase--dark .template-card--orange, .vkui--vkCom--dark .template-card--orange,
+.vkui--vkBase--dark .invite-goal--orange, .vkui--vkCom--dark .invite-goal--orange { --goal-accent: #f0a464; }
+.vkui--vkBase--dark .goal-card--blue, .vkui--vkCom--dark .goal-card--blue,
+.vkui--vkBase--dark .template-card--blue, .vkui--vkCom--dark .template-card--blue,
+.vkui--vkBase--dark .invite-goal--blue, .vkui--vkCom--dark .invite-goal--blue { --goal-accent: #6caaf0; }
+
+.vkui--vkBase--dark .goal-card, .vkui--vkCom--dark .goal-card,
+.vkui--vkBase--dark .template-card, .vkui--vkCom--dark .template-card,
+.vkui--vkBase--dark .invite-goal, .vkui--vkCom--dark .invite-goal {
+  --goal-soft: color-mix(in srgb, var(--goal-accent) 20%, transparent);
+  border-color: color-mix(in srgb, var(--goal-accent) 22%, transparent);
 }
 
-.vkui--scheme_dark .support-card__body .vkuiCaption {
-  color: #aacbbb;
+.vkui--vkBase--dark .daily-summary,
+.vkui--vkCom--dark .daily-summary {
+  box-shadow: none;
 }
 
-.vkui--scheme_dark .goal-type--active {
-  background: #2f2850;
-}
-
-.vkui--scheme_dark .goal-card__icon,
-.vkui--scheme_dark .template-card__icon,
-.vkui--scheme_dark .streak-badge {
-  background: color-mix(in srgb, var(--goal-accent) 20%, transparent);
-}
-
-.vkui--scheme_dark .calendar-day--done {
-  background: #203e33;
+.vkui--vkBase--dark .group-hero,
+.vkui--vkCom--dark .group-hero {
+  box-shadow: none;
 }
 
 @media (min-width: 640px) {

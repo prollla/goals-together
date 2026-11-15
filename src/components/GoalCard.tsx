@@ -63,21 +63,30 @@ export const GoalCard = ({ goal, onOpen, onMark, onAddValue }: GoalCardProps) =>
 
       {goal.type !== 'quantity' && (
         <div className="goal-card__actions">
-          <Button
-            stretched
-            size="m"
-            mode={done ? 'primary' : 'secondary'}
-            before={done ? <Icon20Check /> : undefined}
-            onClick={() => onMark(goal.id, 'done')}
-          >
-            {done ? 'Выполнено' : 'Отметить выполнение'}
-          </Button>
-          {!done && (
-            <Button size="m" mode="tertiary" onClick={() => onMark(goal.id, 'skipped')}>
-              {skipped ? 'Вернуть' : 'Пропустить'}
-            </Button>
+          {done ? (
+            <>
+              <span className="goal-card__status goal-card__status--done" role="status">
+                <Icon20Check />
+                {goal.type === 'quit' ? 'Сегодня без привычки' : 'Выполнено сегодня'}
+              </span>
+              <Button size="m" mode="tertiary" appearance="neutral" onClick={() => onMark(goal.id, 'done')}>
+                Отменить
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button stretched size="m" mode="primary" before={<Icon20Check />} onClick={() => onMark(goal.id, 'done')}>
+                {goal.type === 'quit' ? 'День без привычки' : 'Сделано'}
+              </Button>
+              <Button size="m" mode="tertiary" appearance="neutral" aria-label={skipped ? 'Отменить пропуск' : undefined} onClick={() => onMark(goal.id, 'skipped')}>
+                {skipped ? 'Отменить' : 'Пропустить'}
+              </Button>
+            </>
           )}
         </div>
+      )}
+      {goal.type !== 'quantity' && skipped && (
+        <Caption className="goal-card__skipped-note">День пропущен — серия начнётся заново, история сохранена.</Caption>
       )}
 
       {goal.type === 'quantity' && (

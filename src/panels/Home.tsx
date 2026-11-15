@@ -10,13 +10,14 @@ import { GoalCard } from '../components/GoalCard';
 interface HomeProps extends NavIdProps {
   fetchedUser?: UserInfo;
   goals: Goal[];
+  serverError?: string;
   onOpenGoal: (id: string) => void;
   onCreateGoal: () => void;
   onMark: (id: string, status: 'done' | 'skipped') => void;
   onAddValue: (id: string, value: number) => void;
 }
 
-export const Home = ({ id, fetchedUser, goals, onOpenGoal, onCreateGoal, onMark, onAddValue }: HomeProps) => {
+export const Home = ({ id, fetchedUser, goals, serverError, onOpenGoal, onCreateGoal, onMark, onAddValue }: HomeProps) => {
   const routeNavigator = useRouteNavigator();
   const completed = goals.filter((goal) => isDone(goal.entries[toDateKey()])).length;
   const progress = goals.length ? Math.round((completed / goals.length) * 100) : 0;
@@ -51,6 +52,12 @@ export const Home = ({ id, fetchedUser, goals, onOpenGoal, onCreateGoal, onMark,
           </div>
         </div>
       </Div>
+
+      {serverError && (
+        <Div>
+          <div className="server-banner" role="alert">Общие цели сейчас недоступны: {serverError}</div>
+        </Div>
+      )}
 
       <Div className="create-goal-action">
         <Button stretched size="l" before={<Icon28AddOutline />} onClick={onCreateGoal}>Добавить цель</Button>
