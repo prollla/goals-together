@@ -1,0 +1,30 @@
+services:
+  goals-api:
+    build: .
+    container_name: goals-api
+    restart: unless-stopped
+    init: true
+    read_only: true
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_PATH: /data/goals.db
+      VK_APP_SECRET: ${VK_APP_SECRET:?Set VK_APP_SECRET in .env}
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - goals-db:/data
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  goals-db:
+    name: goals-api-db

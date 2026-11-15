@@ -1,0 +1,15 @@
+node_modules
+build
+.runtime
+.scaffold
+.git
+server/data
+build.zip
+.env
+.env.*
+*.log
+*.pdf
+Dockerfile
+docker-compose.yml
+deploy
+README.md

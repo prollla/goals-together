@@ -1,0 +1,11 @@
+node_modules/
+build/
+.runtime/
+.scaffold/
+.concept-*
+*.log
+.DS_Store
+server/data/
+build.zip
+.env
+.env.*
