@@ -6,6 +6,7 @@ vkBridge.send('VKWebAppInit');
 
 createRoot(document.getElementById('root')!).render(<AppConfig />);
 
-if (import.meta.env.MODE === 'development') {
+// Dev console only on request (?eruda): its floating button covers the UI and looks like a layout bug.
+if (import.meta.env.MODE === 'development' && new URLSearchParams(window.location.search).has('eruda')) {
   import('./eruda.ts');
 }

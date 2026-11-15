@@ -1,6 +1,9 @@
 import { ReactNode, useEffect, useState } from 'react';
 import bridge, { UserInfo } from '@vkontakte/vk-bridge';
-import { ScreenSpinner, Snackbar, SplitCol, SplitLayout, Tabbar, TabbarItem, View } from '@vkontakte/vkui';
+import {
+  Cell, Group as VKGroup, Panel, ScreenSpinner, Snackbar, SplitCol, SplitLayout, Tabbar, TabbarItem, View,
+  useAdaptivityWithJSMediaQueries,
+} from '@vkontakte/vkui';
 import { Icon28HomeOutline, Icon28ListOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { useActiveVkuiLocation, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Catalog, CreateGoal, GoalDetails, Goals, Group, Home, JoinGoal } from './panels';
@@ -10,9 +13,16 @@ import { GoalDraft, GoalTemplate } from './types';
 import { clearGoalInvite, parseGoalInvite } from './utils/invite';
 import { getApiUserId, isVkLaunch } from './api';
 
+const NAV_ITEMS = [
+  { panel: DEFAULT_VIEW_PANELS.HOME, path: '/', label: 'Сегодня', icon: <Icon28HomeOutline /> },
+  { panel: DEFAULT_VIEW_PANELS.GOALS, path: '/goals', label: 'Мои цели', icon: <Icon28ListOutline /> },
+  { panel: DEFAULT_VIEW_PANELS.GROUP, path: '/group', label: 'Группа', icon: <Icon28Users3Outline /> },
+];
+
 export const App = () => {
   const { panel: activePanel = DEFAULT_VIEW_PANELS.HOME } = useActiveVkuiLocation();
   const routeNavigator = useRouteNavigator();
+  const { isDesktop } = useAdaptivityWithJSMediaQueries();
   const [fetchedUser, setUser] = useState<UserInfo | undefined>();
   // Inside VK, wait for the profile before talking to the API (outside VK there is nothing to wait for).
   const [profileReady, setProfileReady] = useState(() => !isVkLaunch());
@@ -103,11 +113,25 @@ export const App = () => {
   };
 
   const mainPanels: string[] = [DEFAULT_VIEW_PANELS.HOME, DEFAULT_VIEW_PANELS.GOALS, DEFAULT_VIEW_PANELS.GROUP];
-  const showTabbar = mainPanels.includes(activePanel);
+  // Desktop gets a sidebar (VK's standard desktop pattern); phones and narrow windows keep the bottom tabbar.
+  const showTabbar = !isDesktop && mainPanels.includes(activePanel);
+  // Nested screens highlight their parent section in the sidebar.
+  const activeSection: string = {
+    [DEFAULT_VIEW_PANELS.GOAL]: DEFAULT_VIEW_PANELS.GOALS,
+    [DEFAULT_VIEW_PANELS.CREATE]: DEFAULT_VIEW_PANELS.GOALS,
+    [DEFAULT_VIEW_PANELS.CATALOG]: DEFAULT_VIEW_PANELS.GOALS,
+    [DEFAULT_VIEW_PANELS.JOIN]: DEFAULT_VIEW_PANELS.GROUP,
+  }[activePanel] || activePanel;
 
   return (
     <SplitLayout center>
-      <SplitCol width="100%" maxWidth={760} className={showTabbar ? 'app-with-tabbar' : ''}>
+      <SplitCol
+        width="100%"
+        maxWidth={isDesktop ? 640 : 760}
+        stretchedOnMobile
+        autoSpaced={isDesktop}
+        className={showTabbar ? 'app-with-tabbar' : ''}
+      >
         <View activePanel={activePanel}>
           <Home id={DEFAULT_VIEW_PANELS.HOME} fetchedUser={fetchedUser} goals={goals} serverError={serverError} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} onMark={markGoal} onAddValue={addValue} />
           <Goals id={DEFAULT_VIEW_PANELS.GOALS} goals={goals} onOpenGoal={openGoal} onCreateGoal={openCustomGoal} onMark={markGoal} onAddValue={addValue} />
@@ -119,19 +143,34 @@ export const App = () => {
         </View>
         {showTabbar && (
           <Tabbar>
-            <TabbarItem selected={activePanel === DEFAULT_VIEW_PANELS.HOME} label="Сегодня" aria-label="Сегодня" onClick={() => routeNavigator.push('/')}>
-              <Icon28HomeOutline />
-            </TabbarItem>
-            <TabbarItem selected={activePanel === DEFAULT_VIEW_PANELS.GOALS} label="Мои цели" aria-label="Мои цели" onClick={() => routeNavigator.push('/goals')}>
-              <Icon28ListOutline />
-            </TabbarItem>
-            <TabbarItem selected={activePanel === DEFAULT_VIEW_PANELS.GROUP} label="Группа" aria-label="Группа" onClick={() => routeNavigator.push('/group')}>
-              <Icon28Users3Outline />
-            </TabbarItem>
+            {NAV_ITEMS.map((item) => (
+              <TabbarItem key={item.panel} selected={activePanel === item.panel} label={item.label} aria-label={item.label} onClick={() => routeNavigator.push(item.path)}>
+                {item.icon}
+              </TabbarItem>
+            ))}
           </Tabbar>
         )}
         {notice && <Snackbar duration={3000} onClose={() => setNotice('')} onClosed={() => setNotice('')}>{notice}</Snackbar>}
       </SplitCol>
+      {isDesktop && (
+        <SplitCol fixed width={280} maxWidth={280} autoSpaced>
+          <Panel className="sidebar">
+            <VKGroup>
+              {NAV_ITEMS.map((item) => (
+                <Cell
+                  key={item.panel}
+                  before={item.icon}
+                  className={`sidebar__item ${activeSection === item.panel ? 'sidebar__item--active' : ''}`}
+                  aria-current={activeSection === item.panel ? 'page' : undefined}
+                  onClick={() => routeNavigator.push(item.path)}
+                >
+                  {item.label}
+                </Cell>
+              ))}
+            </VKGroup>
+          </Panel>
+        </SplitCol>
+      )}
       {popout}
     </SplitLayout>
   );

@@ -56,6 +56,21 @@ button:focus-visible {
   padding-bottom: 72px;
 }
 
+/* Desktop sidebar navigation. */
+.sidebar__item {
+  border-radius: 10px;
+}
+
+.sidebar__item--active {
+  color: var(--brand);
+  background: var(--brand-soft);
+  font-weight: 600;
+}
+
+.sidebar__item--active svg {
+  color: var(--brand);
+}
+
 /* The tabbar is position: fixed; keep it as wide as the 760px content column on desktop. */
 .app-with-tabbar .vkuiTabbar__host {
   left: 50%;
@@ -786,13 +801,8 @@ button:focus-visible {
   box-shadow: none;
 }
 
+/* Goal cards stay in one column: their action row needs ~340px and got squeezed in a 2-column grid. */
 @media (min-width: 640px) {
-  .goal-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-  }
-
   .template-list {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
