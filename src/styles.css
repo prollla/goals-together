@@ -86,7 +86,7 @@ button:focus-visible {
   letter-spacing: -0.5px;
 }
 
-.welcome-block .vkuiText {
+.welcome-block [class*="vkuiText__"] {
   color: var(--vkui--color_text_secondary);
   line-height: 1.4;
 }
@@ -245,7 +245,7 @@ button:focus-visible {
   padding-top: 1px;
 }
 
-.goal-card__heading .vkuiTitle {
+.goal-card__heading [class*="vkuiTitle__"] {
   line-height: 1.25;
 }
 
@@ -269,7 +269,7 @@ button:focus-visible {
   color: var(--vkui--color_text_secondary);
 }
 
-.goal-card__progress-meta .vkuiCaption:last-child {
+.goal-card__progress-meta [class*="vkuiCaption__"]:last-child {
   color: var(--goal-accent);
 }
 
@@ -389,7 +389,7 @@ button:focus-visible {
   min-width: 0;
 }
 
-.support-card__body .vkuiCaption {
+.support-card__body [class*="vkuiCaption__"] {
   display: block;
   margin-top: 4px;
   color: var(--support-caption);
@@ -410,7 +410,7 @@ button:focus-visible {
   text-align: center;
 }
 
-.catalog-intro .vkuiText {
+.catalog-intro [class*="vkuiText__"] {
   display: block;
   margin-top: 7px;
   color: var(--vkui--color_text_secondary);
@@ -466,22 +466,22 @@ button:focus-visible {
   min-width: 0;
 }
 
-.template-card__content > .vkuiCaption {
+.template-card__content > [class*="vkuiCaption__"] {
   color: var(--goal-accent);
 }
 
-.template-card__content .vkuiTitle {
+.template-card__content [class*="vkuiTitle__"] {
   margin: 4px 0;
 }
 
-.template-card__content .vkuiText {
+.template-card__content [class*="vkuiText__"] {
   display: block;
   margin-bottom: 13px;
   color: var(--vkui--color_text_secondary);
   font-size: 14px;
 }
 
-.create-intro .vkuiCaption {
+.create-intro [class*="vkuiCaption__"] {
   display: block;
   margin-top: 7px;
   color: var(--vkui--color_text_secondary);
@@ -591,7 +591,7 @@ button:focus-visible {
   line-height: 1.1;
 }
 
-.stat-card .vkuiCaption {
+.stat-card [class*="vkuiCaption__"] {
   color: var(--vkui--color_text_secondary);
 }
 
@@ -662,44 +662,61 @@ button:focus-visible {
   gap: 9px;
 }
 
-.goal-info .vkuiCaption {
+.goal-info [class*="vkuiCaption__"] {
   color: var(--vkui--color_text_secondary);
   line-height: 1.4;
 }
 
+/* Group screen hero: compact, left-aligned, spacing via gap so it never depends on VKUI typography classes. */
 .group-hero {
-  padding: 24px 20px;
-  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 20px;
+  border-radius: 20px;
   color: #fff;
-  text-align: center;
   background: linear-gradient(145deg, #2e745e, #429879);
-  box-shadow: 0 12px 28px rgba(39, 139, 105, 0.18);
+  box-shadow: 0 10px 24px rgba(39, 139, 105, 0.16);
+}
+
+.group-hero__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .group-hero__icon {
   display: grid;
   place-items: center;
-  width: 60px;
-  height: 60px;
-  margin: 0 auto 12px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.14);
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
 }
 
-.group-hero > .vkuiCaption {
-  color: #c8eddd;
-  letter-spacing: 1px;
+.group-hero__eyebrow {
+  color: #d2f0e3;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
 }
 
-.group-hero .vkuiTitle {
-  margin: 7px 0;
+.group-hero__title {
+  margin: 6px 0 0;
   color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
-.group-hero .vkuiText {
-  display: block;
-  margin-bottom: 18px;
-  color: #d9eee5;
+.group-hero__text {
+  margin: 0 0 8px;
+  color: #e1f3eb;
+  font-size: 15px;
+  line-height: 1.4;
 }
 
 .group-hero .group-invite {
@@ -707,85 +724,12 @@ button:focus-visible {
   background: #fff !important;
 }
 
-.member-card {
-  padding: 16px;
-  border-radius: 18px;
-  background: var(--vkui--color_background_content);
-}
-
-.member-card__header {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  margin-bottom: 14px;
-}
-
-.member-card__header > .member-card__info {
-  flex: 1;
-  min-width: 0;
-}
-
-.member-card__header > .vkuiAvatar {
-  flex: 0 0 auto;
-}
-
-.member-card__header .vkuiCaption {
-  display: block;
-  overflow: hidden;
-  margin-top: 3px;
+.group-footnote {
+  margin: 4px 0 12px;
   color: var(--vkui--color_text_secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.member-status {
-  flex: 0 0 auto;
-  padding: 5px 8px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.member-status--done {
-  color: var(--success-strong);
-  background: var(--success-bg);
-}
-
-.member-status--pending {
-  color: var(--warning-text);
-  background: var(--warning-bg);
-}
-
-.member-card > .vkuiCaption {
-  display: block;
-  margin-top: 8px;
-  color: var(--vkui--color_text_secondary);
-}
-
-.member-card__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 8px 0 2px;
-  color: var(--brand);
-}
-
-.member-card__footer .vkuiCaption {
-  color: var(--vkui--color_text_secondary);
-}
-
-.demo-note {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 12px;
-  text-align: center;
-}
-
-.demo-note .vkuiCaption {
-  color: var(--vkui--color_text_secondary);
+  font-size: 13px;
   line-height: 1.4;
+  text-align: center;
 }
 
 .empty-state {
@@ -796,6 +740,20 @@ button:focus-visible {
   padding: 36px 20px;
   text-align: center;
 }
+
+.empty-state__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.empty-state__text {
+  margin: 0;
+  color: var(--vkui--color_text_secondary);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 
 /* Dark theme: brighter accents for text contrast, translucent tints instead of pastel backgrounds. */
 .vkui--vkBase--dark .goal-card--violet, .vkui--vkCom--dark .goal-card--violet,
@@ -863,10 +821,6 @@ button:focus-visible {
     display: none;
   }
 
-  .member-status {
-    max-width: 86px;
-    text-align: center;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -889,16 +843,16 @@ button:focus-visible {
   color: var(--vkui--color_text_negative) !important;
 }
 
-.join-intro > .vkuiCaption {
+.join-intro > [class*="vkuiCaption__"] {
   color: var(--brand);
   letter-spacing: 0.8px;
 }
 
-.join-intro .vkuiTitle {
+.join-intro [class*="vkuiTitle__"] {
   margin: 7px 0 10px;
 }
 
-.join-intro .vkuiText {
+.join-intro [class*="vkuiText__"] {
   color: var(--vkui--color_text_secondary);
   line-height: 1.45;
 }
@@ -931,12 +885,12 @@ button:focus-visible {
   background: var(--goal-soft);
 }
 
-.invite-goal > .vkuiCaption,
-.invite-goal__details .vkuiCaption {
+.invite-goal > [class*="vkuiCaption__"],
+.invite-goal__details [class*="vkuiCaption__"] {
   color: var(--goal-accent);
 }
 
-.invite-goal > .vkuiText {
+.invite-goal > [class*="vkuiText__"] {
   color: var(--vkui--color_text_secondary);
 }
 
@@ -949,7 +903,7 @@ button:focus-visible {
   border-top: 1px solid var(--vkui--color_separator_primary);
 }
 
-.join-benefits .vkuiText {
+.join-benefits [class*="vkuiText__"] {
   margin-bottom: 8px;
   font-weight: 600;
 }
@@ -959,10 +913,6 @@ button:focus-visible {
   padding-left: 20px;
   color: var(--vkui--color_text_secondary);
   line-height: 1.7;
-}
-
-.member-card > .vkuiButton {
-  margin-top: 12px;
 }
 
 @media (min-width: 768px) {
@@ -980,11 +930,12 @@ button:focus-visible {
 .shared-goals-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .shared-goal {
   padding: 16px;
+  border: 1px solid var(--vkui--color_separator_primary);
   border-radius: 18px;
   background: var(--vkui--color_background_content);
 }
@@ -992,28 +943,142 @@ button:focus-visible {
 .shared-goal__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 4px;
 }
 
-.shared-goal__header .vkuiCaption {
+.shared-goal__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--goal-accent);
+  background: color-mix(in srgb, var(--goal-accent) 14%, transparent);
+}
+
+.shared-goal__heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.shared-goal__title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shared-goal__meta {
   display: block;
-  margin-top: 4px;
+  margin-top: 2px;
   color: var(--vkui--color_text_secondary);
+  font-size: 13px;
+  line-height: 1.35;
 }
 
-.shared-goal .member-card {
-  background: var(--vkui--color_background_secondary);
+.shared-goal__share {
+  flex: 0 0 auto;
+  color: var(--goal-accent) !important;
 }
 
-@media (max-width: 420px) {
-  .shared-goal__header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
+.shared-goal .member-list {
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 
-  .shared-goal__header .vkuiButton {
-    align-self: stretch;
-  }
+.member-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--vkui--color_separator_primary);
+}
+
+.member-row:first-child {
+  border-top: 0;
+}
+
+.member-row > .vkuiAvatar__host {
+  flex: 0 0 auto;
+}
+
+.member-row__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  --vkui--color_background_accent: var(--goal-accent);
+  --vkui--color_background_accent_themed: var(--goal-accent);
+}
+
+.member-row__top,
+.member-row__bottom {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.member-row__name {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-row__percent {
+  flex: 0 0 auto;
+  color: var(--goal-accent);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.member-row__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--vkui--color_text_secondary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.member-row__status--done {
+  color: var(--success-text);
+  font-weight: 600;
+}
+
+.member-row__summary {
+  overflow: hidden;
+  color: var(--vkui--color_text_secondary);
+  font-size: 13px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shared-goal__invite-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px dashed color-mix(in srgb, var(--goal-accent) 45%, transparent);
+  border-radius: 12px;
+  color: var(--goal-accent);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
 }
