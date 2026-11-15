@@ -1,5 +1,5 @@
 import { CSSProperties } from 'react';
-import { Avatar, Button, Caption, Div, Group, Header, Panel, PanelHeader, Progress, Text, Title } from '@vkontakte/vkui';
+import { Avatar, Button, Caption, Div, Group, Header, Panel, PanelHeader, Text, Title } from '@vkontakte/vkui';
 import { Icon28AddOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
@@ -45,9 +45,8 @@ export const Home = ({ id, fetchedUser, goals, serverError, onOpenGoal, onCreate
             <Text className="daily-summary__text">
               {goals.length === 0 ? 'Определите небольшой шаг, который хотите сделать.' : allDone ? 'Отличная работа. Можно выдохнуть.' : 'Отметьте прогресс — без давления и обязательств.'}
             </Text>
-            <Progress value={progress} className="daily-summary__progress" aria-label="Дневной прогресс" />
           </div>
-          <div className="progress-ring" style={{ '--progress': `${progress * 3.6}deg` } as CSSProperties}>
+          <div className="progress-ring" role="img" aria-label={`Дневной прогресс: ${progress}%`} style={{ '--progress': `${progress * 3.6}deg` } as CSSProperties}>
             <span>{progress}%</span>
           </div>
         </div>
@@ -59,9 +58,9 @@ export const Home = ({ id, fetchedUser, goals, serverError, onOpenGoal, onCreate
         </Div>
       )}
 
-      <Div className="create-goal-action">
-        <Button stretched size="l" before={<Icon28AddOutline />} onClick={onCreateGoal}>Добавить цель</Button>
-        <Button stretched size="m" mode="tertiary" onClick={() => routeNavigator.push('/catalog')}>Выбрать из шаблонов</Button>
+      <Div className="top-actions">
+        <Button stretched size="m" before={<Icon28AddOutline width={20} height={20} />} onClick={onCreateGoal}>Новая цель</Button>
+        <Button stretched size="m" mode="secondary" onClick={() => routeNavigator.push('/catalog')}>Из шаблона</Button>
       </Div>
 
       <Group mode="plain" header={<Header size="s">Что отметить сегодня</Header>}>

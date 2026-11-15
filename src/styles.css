@@ -71,6 +71,27 @@ button:focus-visible {
   color: var(--brand);
 }
 
+/* Touch screens: no visible page scrollbar (mobile browsers/webviews draw it over the content edge). */
+@media (hover: none) and (pointer: coarse) {
+  html,
+  body {
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Shared top-of-screen action row: two equal medium buttons, same weight as the cards below. */
+.top-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 0;
+}
+
 /* The tabbar is position: fixed; keep it as wide as the 760px content column on desktop. */
 .app-with-tabbar .vkuiTabbar__host {
   left: 50%;
@@ -85,20 +106,22 @@ button:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-top: 20px;
-  padding-bottom: 14px;
+  padding-top: 16px;
+  padding-bottom: 12px;
 }
 
 .welcome-block__date {
   display: block;
   color: var(--brand);
   text-transform: capitalize;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .welcome-block__title {
-  margin-bottom: 6px;
-  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+  font-size: 22px !important;
+  line-height: 28px !important;
+  letter-spacing: -0.3px;
 }
 
 .welcome-block [class*="vkuiText__"] {
@@ -111,23 +134,22 @@ button:focus-visible {
   overflow: hidden;
   display: flex;
   align-items: center;
-  gap: 18px;
-  min-height: 154px;
-  padding: 22px;
-  border-radius: 22px;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
   color: #fff;
   background: linear-gradient(135deg, #5540be 0%, #755bdd 62%, #8e75e6 100%);
-  box-shadow: 0 12px 28px rgba(80, 57, 189, 0.2);
+  box-shadow: 0 4px 14px rgba(80, 57, 189, 0.14);
 }
 
 .daily-summary::after {
   content: '';
   position: absolute;
-  width: 180px;
-  height: 180px;
-  right: -65px;
-  top: -85px;
-  border: 30px solid rgba(255, 255, 255, 0.08);
+  width: 140px;
+  height: 140px;
+  right: -50px;
+  top: -70px;
+  border: 24px solid rgba(255, 255, 255, 0.07);
   border-radius: 50%;
 }
 
@@ -145,7 +167,7 @@ button:focus-visible {
 }
 
 .daily-summary__title {
-  margin: 7px 0;
+  margin: 4px 0;
   color: #fff;
 }
 
@@ -156,10 +178,6 @@ button:focus-visible {
   line-height: 1.35;
 }
 
-.daily-summary__progress {
-  --vkui--color_background_accent: #baf2d7;
-  margin-top: 16px;
-}
 
 .progress-ring {
   position: relative;
@@ -167,8 +185,8 @@ button:focus-visible {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 78px;
-  height: 78px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: conic-gradient(#baf2d7 var(--progress), rgba(255, 255, 255, 0.18) 0);
 }
@@ -176,7 +194,7 @@ button:focus-visible {
 .progress-ring::after {
   content: '';
   position: absolute;
-  inset: 7px;
+  inset: 6px;
   border-radius: 50%;
   background: #7157d2;
 }
@@ -184,7 +202,7 @@ button:focus-visible {
 .progress-ring span {
   position: relative;
   z-index: 1;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -687,12 +705,12 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  padding: 20px;
-  border-radius: 20px;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 18px;
   color: #fff;
   background: linear-gradient(145deg, #2e745e, #429879);
-  box-shadow: 0 10px 24px rgba(39, 139, 105, 0.16);
+  box-shadow: 0 4px 14px rgba(39, 139, 105, 0.14);
 }
 
 .group-hero__top {
@@ -720,15 +738,15 @@ button:focus-visible {
 }
 
 .group-hero__title {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: #fff;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.25;
 }
 
 .group-hero__text {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   color: #e1f3eb;
   font-size: 15px;
   line-height: 1.4;
@@ -808,9 +826,6 @@ button:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .daily-summary {
-    min-height: 170px;
-  }
 }
 
 @media (max-width: 420px) {
