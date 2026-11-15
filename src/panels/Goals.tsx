@@ -1,4 +1,4 @@
-import { Button, Caption, Div, Group, Header, Panel, PanelHeader, Text } from '@vkontakte/vkui';
+import { Button, Div, Group, Header, Panel, PanelHeader, Text } from '@vkontakte/vkui';
 import { Icon28AddOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Goal, NavIdProps } from '../types';
@@ -18,12 +18,9 @@ export const Goals = ({ id, goals, onOpenGoal, onCreateGoal, onMark, onAddValue 
   return (
     <Panel id={id}>
       <PanelHeader>Мои цели</PanelHeader>
-      <Div className="create-goal-action">
-        <Button stretched size="l" before={<Icon28AddOutline />} onClick={onCreateGoal}>Добавить цель</Button>
-        <Button stretched size="m" mode="secondary" onClick={() => routeNavigator.push('/catalog')}>
-          Открыть каталог шаблонов
-        </Button>
-        <Caption className="section-note">Название, срок и правило можно изменить при создании.</Caption>
+      <Div className="top-actions">
+        <Button stretched size="m" before={<Icon28AddOutline width={20} height={20} />} onClick={onCreateGoal}>Новая цель</Button>
+        <Button stretched size="m" mode="secondary" onClick={() => routeNavigator.push('/catalog')}>Из шаблона</Button>
       </Div>
       <Group mode="plain" header={<Header size="s">Активные · {goals.length}</Header>}>
         <Div className="goal-list">

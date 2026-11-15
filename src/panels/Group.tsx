@@ -1,23 +1,25 @@
-import { useState } from 'react';
 import bridge, { UserInfo } from '@vkontakte/vk-bridge';
-import { Avatar, Button, Caption, Div, Group as VKGroup, Header, Panel, PanelHeader, Progress, Snackbar, Text, Title } from '@vkontakte/vkui';
-import { Icon28AddOutline, Icon28ShareOutline, Icon28Users3Outline } from '@vkontakte/icons';
-import { Goal, NavIdProps } from '../types';
-import { getDoneDays, getProgress, isDone, toDateKey } from '../utils/goals';
+import { Avatar, Button, Div, Group as VKGroup, Header, IconButton, Panel, PanelHeader, Progress } from '@vkontakte/vkui';
+import { Icon20Check, Icon24ShareOutline, Icon28AddOutline, Icon28ShareOutline, Icon28Users3Outline } from '@vkontakte/icons';
+import { Goal, GoalParticipant, NavIdProps } from '../types';
+import { formatNumber, getCurrentValue, getDoneDays, getProgress, isDone, plural, toDateKey } from '../utils/goals';
 import { createGoalInviteLink } from '../utils/invite';
 import { getApiUserId } from '../api';
+import { GoalTypeIcon } from '../components/GoalTypeIcon';
 
 interface GroupProps extends NavIdProps {
   goals: Goal[];
   fetchedUser?: UserInfo;
   onCreateGoal: () => void;
   serverError: string;
+  onNotice: (message: string) => void;
 }
 
-export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError }: GroupProps) => {
-  const [notice, setNotice] = useState('');
+// Own class names on every text node: VKUI 8 typography classes are internal (vkuiTitle__level1 …) and not stable.
+export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError, onNotice: setNotice }: GroupProps) => {
   const sharedGoals = goals.filter((goal) => goal.privacy === 'group');
   const currentUserId = getApiUserId(fetchedUser);
+  const today = toDateKey();
 
   const share = async (goal: Goal) => {
     const link = createGoalInviteLink(goal);
@@ -35,67 +37,120 @@ export const Group = ({ id, goals, fetchedUser, onCreateGoal, serverError }: Gro
     }
   };
 
+  const participantSummary = (goal: Goal, participant: GoalParticipant) => {
+    const participantGoal = { ...goal, entries: participant.entries };
+    if (goal.type === 'quantity') {
+      return `${formatNumber(getCurrentValue(participantGoal))} из ${formatNumber(goal.target || 0)} ${goal.unit || ''}`.trim();
+    }
+    const days = getDoneDays(participantGoal);
+    return `${days} ${plural(days, ['успешный день', 'успешных дня', 'успешных дней'])}`;
+  };
+
   return (
     <Panel id={id}>
       <PanelHeader>Группа</PanelHeader>
       <Div>
-        <div className="group-hero">
-          <span className="group-hero__icon"><Icon28Users3Outline width={32} height={32} /></span>
-          <Caption>ОДНА ЦЕЛЬ — СВОЙ ПРОГРЕСС</Caption>
-          <Title level="1" weight="2">Видите результаты<br />и поддерживайте друг друга</Title>
-          <Text>У каждого участника отдельные отметки и независимая история</Text>
-          {sharedGoals.length > 0 ? (
-            <Button className="group-invite" size="l" mode="secondary" before={<Icon28ShareOutline />} onClick={() => share(sharedGoals[0])}>Пригласить друга</Button>
+        <section className="group-hero">
+          <div className="group-hero__top">
+            <span className="group-hero__icon"><Icon28Users3Outline /></span>
+            <span className="group-hero__eyebrow">Одна цель — свой прогресс</span>
+          </div>
+          <h2 className="group-hero__title">Поддерживайте друг друга</h2>
+          <p className="group-hero__text">Каждый отмечает свои дни, а прогресс друзей виден здесь.</p>
+          {/* With several goals the hero cannot know which one to share: each card has its own invite button. */}
+          {sharedGoals.length === 1 ? (
+            <Button className="group-invite" size="m" mode="secondary" before={<Icon28ShareOutline width={20} height={20} />} onClick={() => share(sharedGoals[0])}>
+              Пригласить друга
+            </Button>
           ) : (
-            <Button className="group-invite" size="l" mode="secondary" before={<Icon28AddOutline />} onClick={onCreateGoal}>Создать общую цель</Button>
+            <Button className="group-invite" size="m" mode="secondary" before={<Icon28AddOutline width={20} height={20} />} onClick={onCreateGoal}>
+              {sharedGoals.length ? 'Новая общая цель' : 'Создать общую цель'}
+            </Button>
           )}
-        </div>
+        </section>
       </Div>
 
-      {serverError && <Div><Caption className="form-error">{serverError}</Caption></Div>}
-      <VKGroup mode="plain" header={<Header size="s">Общие цели и участники</Header>}>
-        <Div className="shared-goals-list">
-          {sharedGoals.map((goal) => (
-            <article className="shared-goal" key={goal.id}>
-              <div className="shared-goal__header">
-                <div><Title level="2" weight="2">{goal.title}</Title><Caption>Участников: {goal.participants?.length || 1}</Caption></div>
-                <Button size="m" mode="secondary" before={<Icon28ShareOutline />} onClick={() => share(goal)}>Пригласить</Button>
-              </div>
-              <div className="member-list">
-                {(goal.participants || []).map((participant) => {
-                  const participantGoal = { ...goal, entries: participant.entries };
-                  const done = isDone(participant.entries[toDateKey()]);
-                  const progress = getProgress(participantGoal);
-                  return (
-                    <div className="member-card" key={participant.userId}>
-                      <div className="member-card__header">
-                        <Avatar size={44} src={participant.photoUrl} initials={participant.firstName.slice(0, 1)} gradientColor="blue" />
-                        <div className="member-card__info">
-                          <Title level="3" weight="2">{participant.userId === currentUserId ? 'Вы' : participant.firstName}</Title>
-                          <Caption>{done ? 'Цель отмечена сегодня' : 'Сегодня ещё без отметки'}</Caption>
-                        </div>
-                        <span className={`member-status ${done ? 'member-status--done' : 'member-status--pending'}`}>{done ? 'Выполнено' : 'В процессе'}</span>
-                      </div>
-                      <Progress value={progress} aria-label={`Прогресс участника ${participant.firstName}`} />
-                      <div className="member-card__footer"><Caption>{getDoneDays(participantGoal)} успешных дней</Caption><strong>{progress}%</strong></div>
-                    </div>
-                  );
-                })}
-              </div>
-            </article>
-          ))}
-          {sharedGoals.length === 0 && (
-            <div className="empty-state">
-              <Title level="2" weight="2">Пока нет общих целей</Title>
-              <Text>Создайте цель с друзьями и отправьте приглашение. После присоединения здесь появятся участники и их актуальный прогресс.</Text>
-            </div>
-          )}
+      {serverError && (
+        <Div>
+          <div className="server-banner" role="alert">Не удалось обновить общие цели: {serverError}</div>
         </Div>
-      </VKGroup>
-      <Div className="demo-note">
-        <Text>Каждый отмечает только свой прогресс. Результаты участников обновляются автоматически.</Text>
+      )}
+
+      {sharedGoals.length > 0 && (
+        <VKGroup mode="plain" header={<Header size="s">Общие цели · {sharedGoals.length}</Header>}>
+          <Div className="shared-goals-list">
+            {sharedGoals.map((goal) => {
+              const participants = [...(goal.participants || [])].sort((left, right) =>
+                Number(right.userId === currentUserId) - Number(left.userId === currentUserId));
+              const doneToday = participants.filter((participant) => isDone(participant.entries[today])).length;
+              const count = participants.length || 1;
+              return (
+                <article className={`shared-goal goal-card--${goal.color}`} key={goal.id}>
+                  <header className="shared-goal__header">
+                    <span className="shared-goal__icon"><GoalTypeIcon type={goal.type} size={22} /></span>
+                    <div className="shared-goal__heading">
+                      <h3 className="shared-goal__title">{goal.title}</h3>
+                      <span className="shared-goal__meta">
+                        {count} {plural(count, ['участник', 'участника', 'участников'])} · сегодня {doneToday} из {count}
+                      </span>
+                    </div>
+                    <IconButton label="Пригласить в эту цель" onClick={() => share(goal)} className="shared-goal__share">
+                      <Icon24ShareOutline />
+                    </IconButton>
+                  </header>
+
+                  <ul className="member-list">
+                    {participants.map((participant) => {
+                      const isMe = participant.userId === currentUserId;
+                      const done = isDone(participant.entries[today]);
+                      const progress = getProgress({ ...goal, entries: participant.entries });
+                      return (
+                        <li className="member-row" key={participant.userId}>
+                          <Avatar size={40} src={participant.photoUrl} initials={(isMe ? 'Вы' : participant.firstName).slice(0, 1)} gradientColor="blue" />
+                          <div className="member-row__body">
+                            <div className="member-row__top">
+                              <span className="member-row__name">{isMe ? 'Вы' : participant.firstName}</span>
+                              <span className="member-row__percent">{progress}%</span>
+                            </div>
+                            <Progress value={progress} aria-label={`Прогресс: ${isMe ? 'вы' : participant.firstName}`} />
+                            <div className="member-row__bottom">
+                              <span className={`member-row__status ${done ? 'member-row__status--done' : ''}`}>
+                                {done && <Icon20Check width={14} height={14} />}
+                                {done ? 'Отмечено сегодня' : 'Сегодня без отметки'}
+                              </span>
+                              <span className="member-row__summary">{participantSummary(goal, participant)}</span>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  {count === 1 && (
+                    <button type="button" className="shared-goal__invite-hint" onClick={() => share(goal)}>
+                      <Icon28AddOutline width={20} height={20} />
+                      Пригласить друга в цель
+                    </button>
+                  )}
+                </article>
+              );
+            })}
+          </Div>
+        </VKGroup>
+      )}
+
+      {sharedGoals.length === 0 && (
+        <Div>
+          <div className="empty-state">
+            <h3 className="empty-state__title">Пока нет общих целей</h3>
+            <p className="empty-state__text">Создайте цель с друзьями и отправьте приглашение. Когда друзья присоединятся, здесь появится их прогресс.</p>
+          </div>
+        </Div>
+      )}
+
+      <Div>
+        <p className="group-footnote">Каждый отмечает только свой прогресс. Данные участников обновляются автоматически.</p>
       </Div>
-      {notice && <Snackbar duration={3000} onClose={() => setNotice('')} onClosed={() => setNotice('')}>{notice}</Snackbar>}
     </Panel>
   );
 };

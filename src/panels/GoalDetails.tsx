@@ -4,11 +4,12 @@ import { Icon28DeleteOutline } from '@vkontakte/icons';
 import { useParams } from '@vkontakte/vk-mini-apps-router';
 import { useSafeBack } from '../hooks/useSafeBack';
 import { Goal, NavIdProps } from '../types';
-import { dateFromKey, getCurrentValue, getDoneDays, getProgress, getStreak, shiftDate, toDateKey } from '../utils/goals';
+import { dateFromKey, getCurrentValue, getDoneDays, getProgress, getStreak, plural, shiftDate, toDateKey } from '../utils/goals';
 import { GoalCard } from '../components/GoalCard';
 
 interface GoalDetailsProps extends NavIdProps {
   goals: Goal[];
+  loading?: boolean;
   currentUserId: string;
   onOpenGoal: (id: string) => void;
   onMark: (id: string, status: 'done' | 'skipped') => void;
@@ -16,7 +17,7 @@ interface GoalDetailsProps extends NavIdProps {
   onDelete: (id: string) => void;
 }
 
-export const GoalDetails = ({ id, goals, currentUserId, onOpenGoal, onMark, onAddValue, onDelete }: GoalDetailsProps) => {
+export const GoalDetails = ({ id, goals, loading, currentUserId, onOpenGoal, onMark, onAddValue, onDelete }: GoalDetailsProps) => {
   const goBack = useSafeBack();
   const params = useParams<'id'>();
   const [isDeleteOpen, setDeleteOpen] = useState(false);
@@ -26,7 +27,7 @@ export const GoalDetails = ({ id, goals, currentUserId, onOpenGoal, onMark, onAd
     return (
       <Panel id={id}>
         <PanelHeader before={<PanelHeaderBack onClick={goBack} />}>Цель</PanelHeader>
-        <Div className="empty-state"><Text>Цель не найдена. Вернитесь к списку и выберите другую.</Text></Div>
+        <Div className="empty-state"><Text>{loading ? 'Загружаем цель…' : 'Цель не найдена. Вернитесь к списку и выберите другую.'}</Text></Div>
       </Panel>
     );
   }
@@ -46,8 +47,8 @@ export const GoalDetails = ({ id, goals, currentUserId, onOpenGoal, onMark, onAd
       </Div>
       <Group mode="plain" header={<Header size="s">Ваши достижения</Header>}>
         <Div className="stats-grid">
-          <div className="stat-card"><strong>{streak}</strong><Caption>{streak === 1 ? 'день подряд' : 'дней подряд'}</Caption></div>
-          <div className="stat-card"><strong>{goal.type === 'quantity' ? currentValue.toLocaleString('ru-RU') : doneDays}</strong><Caption>{goal.type === 'quantity' ? goal.unit : doneDays === 1 ? 'успешный день' : 'успешных дней'}</Caption></div>
+          <div className="stat-card"><strong>{streak}</strong><Caption>{plural(streak, ['день подряд', 'дня подряд', 'дней подряд'])}</Caption></div>
+          <div className="stat-card"><strong>{goal.type === 'quantity' ? currentValue.toLocaleString('ru-RU') : doneDays}</strong><Caption>{goal.type === 'quantity' ? goal.unit : plural(doneDays, ['успешный день', 'успешных дня', 'успешных дней'])}</Caption></div>
           <div className="stat-card"><strong>{progress}%</strong><Caption>общий прогресс</Caption></div>
         </Div>
       </Group>
@@ -88,7 +89,9 @@ export const GoalDetails = ({ id, goals, currentUserId, onOpenGoal, onMark, onAd
           title={goal.privacy === 'group' && goal.ownerId !== currentUserId ? 'Выйти из цели?' : 'Удалить цель?'}
           description={goal.privacy === 'group' && goal.ownerId !== currentUserId
             ? 'Ваша история в этой цели будет удалена. Цель и прогресс остальных участников сохранятся.'
-            : `«${goal.title}» и вся история прогресса будут удалены. Это действие нельзя отменить.`}
+            : goal.privacy === 'group' && (goal.participants?.length || 1) > 1
+              ? `Цель «${goal.title}» будет удалена у всех участников (${goal.participants?.length}) вместе с их прогрессом. Это действие нельзя отменить.`
+              : `«${goal.title}» и вся история прогресса будут удалены. Это действие нельзя отменить.`}
           actionsLayout="vertical"
           actions={[
             { title: 'Отмена', mode: 'cancel' },

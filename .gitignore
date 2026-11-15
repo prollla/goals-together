@@ -9,3 +9,4 @@ server/data/
 build.zip
 .env
 .env.*
+!.env.production

@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Icon24ChevronRight, Icon20Check } from '@vkontakte/icons';
 import { Button, Caption, Card, Input, Progress, Text, Title } from '@vkontakte/vkui';
 import { Goal } from '../types';
-import { formatNumber, getCurrentValue, getDoneDays, getProgress, getStreak, isDone, toDateKey } from '../utils/goals';
+import { formatNumber, getCurrentValue, getDoneDays, getProgress, getStreak, isDone, plural, toDateKey } from '../utils/goals';
 import { GoalTypeIcon } from './GoalTypeIcon';
 
 interface GoalCardProps {
@@ -36,8 +36,8 @@ export const GoalCard = ({ goal, onOpen, onMark, onAddValue }: GoalCardProps) =>
     goal.type === 'quantity'
       ? `${formatNumber(value)} из ${formatNumber(goal.target || 0)} ${goal.unit || ''}`
       : goal.duration
-        ? `${getDoneDays(goal)} из ${goal.duration} дней`
-        : `${getDoneDays(goal)} успешных дней`;
+        ? `${getDoneDays(goal)} из ${goal.duration} ${plural(goal.duration, ['дня', 'дней', 'дней'])}`
+        : `${getDoneDays(goal)} ${plural(getDoneDays(goal), ['успешный день', 'успешных дня', 'успешных дней'])}`;
 
   return (
     <Card mode="shadow" className={`goal-card goal-card--${goal.color}`}>
@@ -57,27 +57,36 @@ export const GoalCard = ({ goal, onOpen, onMark, onAddValue }: GoalCardProps) =>
       <Progress value={progress} aria-label={`Прогресс цели ${goal.title}`} />
 
       <div className="goal-card__footer">
-        <span className="streak-badge">{streak > 0 ? `Серия ${streak} ${streak === 1 ? 'день' : streak < 5 ? 'дня' : 'дней'}` : 'Первый шаг — сегодня'}</span>
+        <span className="streak-badge">{streak > 0 ? `Серия ${streak} ${plural(streak, ['день', 'дня', 'дней'])}` : 'Первый шаг — сегодня'}</span>
         {goal.privacy === 'group' && <Caption>с друзьями</Caption>}
       </div>
 
       {goal.type !== 'quantity' && (
         <div className="goal-card__actions">
-          <Button
-            stretched
-            size="m"
-            mode={done ? 'primary' : 'secondary'}
-            before={done ? <Icon20Check /> : undefined}
-            onClick={() => onMark(goal.id, 'done')}
-          >
-            {done ? 'Выполнено' : 'Отметить выполнение'}
-          </Button>
-          {!done && (
-            <Button size="m" mode="tertiary" onClick={() => onMark(goal.id, 'skipped')}>
-              {skipped ? 'Вернуть' : 'Пропустить'}
-            </Button>
+          {done ? (
+            <>
+              <span className="goal-card__status goal-card__status--done" role="status">
+                <Icon20Check />
+                {goal.type === 'quit' ? 'Сегодня без привычки' : 'Выполнено сегодня'}
+              </span>
+              <Button size="m" mode="tertiary" appearance="neutral" onClick={() => onMark(goal.id, 'done')}>
+                Отменить
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button stretched size="m" mode="primary" before={<Icon20Check />} onClick={() => onMark(goal.id, 'done')}>
+                {goal.type === 'quit' ? 'День без привычки' : 'Сделано'}
+              </Button>
+              <Button size="m" mode="tertiary" appearance="neutral" aria-label={skipped ? 'Отменить пропуск' : undefined} onClick={() => onMark(goal.id, 'skipped')}>
+                {skipped ? 'Отменить' : 'Пропустить'}
+              </Button>
+            </>
           )}
         </div>
+      )}
+      {goal.type !== 'quantity' && skipped && (
+        <Caption className="goal-card__skipped-note">День пропущен — серия начнётся заново, история сохранена.</Caption>
       )}
 
       {goal.type === 'quantity' && (

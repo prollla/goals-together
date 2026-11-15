@@ -6,7 +6,7 @@ import { GoalTypeIcon } from '../components/GoalTypeIcon';
 
 interface CreateGoalProps extends NavIdProps {
   template?: GoalTemplate;
-  onCreate: (draft: GoalDraft) => void;
+  onCreate: (draft: GoalDraft) => Promise<void> | void;
 }
 
 const typeOptions: { type: GoalType; title: string; subtitle: string }[] = [
@@ -16,6 +16,7 @@ const typeOptions: { type: GoalType; title: string; subtitle: string }[] = [
 ];
 
 const colors: GoalColor[] = ['violet', 'green', 'orange', 'blue'];
+const colorNames: Record<GoalColor, string> = { violet: 'фиолетовый', green: 'зелёный', orange: 'оранжевый', blue: 'синий' };
 
 export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
   const goBack = useSafeBack();
@@ -31,9 +32,11 @@ export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
   const [unit, setUnit] = useState(template?.unit || 'раз');
   const [privacy, setPrivacy] = useState<GoalPrivacy>('private');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     if (!title.trim()) {
       setError('Добавьте название цели');
       return;
@@ -42,8 +45,15 @@ export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
       setError('Укажите целевое значение и единицу измерения');
       return;
     }
+    const weeklyCount = Number(weeklyTarget);
+    if (type !== 'quantity' && frequency === 'weekly' && (!Number.isInteger(weeklyCount) || weeklyCount < 1 || weeklyCount > 7)) {
+      setError('Укажите, сколько раз в неделю: от 1 до 7');
+      return;
+    }
 
-    onCreate({
+    setSubmitting(true);
+    try {
+      await onCreate({
       title: title.trim(),
       rule: rule.trim() || 'Отмечать прогресс каждый день',
       category,
@@ -55,7 +65,10 @@ export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
       target: type === 'quantity' ? Number(target) : undefined,
       unit: type === 'quantity' ? unit.trim() : undefined,
       privacy,
-    });
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const changeType = (nextType: GoalType) => {
@@ -66,7 +79,7 @@ export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
   return (
     <Panel id={id}>
       <PanelHeader before={<PanelHeaderBack onClick={goBack} />}>{template ? 'Настройка цели' : 'Новая цель'}</PanelHeader>
-      <form onSubmit={submit}>
+      <form onSubmit={(event) => void submit(event)}>
         <Div className="create-intro">
           <Title level="2" weight="2">Какую цель хотите достичь?</Title>
           <Caption>Сформулируйте понятное правило — его будет легко отметить.</Caption>
@@ -125,7 +138,7 @@ export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
             <FormItem top="Цвет карточки">
               <div className="color-picker">
                 {colors.map((item) => (
-                  <button key={item} type="button" aria-label={`Выбрать ${item} цвет`} className={`color-dot color-dot--${item} ${color === item ? 'color-dot--active' : ''}`} onClick={() => setColor(item)} />
+                  <button key={item} type="button" aria-label={`Цвет: ${colorNames[item]}`} aria-pressed={color === item} className={`color-dot color-dot--${item} ${color === item ? 'color-dot--active' : ''}`} onClick={() => setColor(item)} />
                 ))}
               </div>
             </FormItem>
@@ -137,7 +150,7 @@ export const CreateGoal = ({ id, template, onCreate }: CreateGoalProps) => {
               <Radio name="privacy" value="group" checked={privacy === 'group'} onChange={() => setPrivacy('group')} description="У каждого свой прогресс, результаты видны участникам">Цель с друзьями</Radio>
             </RadioGroup>
             {error && <Caption className="form-error">{error}</Caption>}
-            <Button stretched size="l" type="submit" className="submit-goal">Создать цель</Button>
+            <Button stretched size="l" type="submit" className="submit-goal" loading={submitting} disabled={submitting}>Создать цель</Button>
           </Div>
         </FormLayoutGroup>
       </form>

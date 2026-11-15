@@ -1,22 +1,23 @@
 import { CSSProperties } from 'react';
-import { Avatar, Button, Caption, Div, Group, Header, Panel, PanelHeader, Progress, Text, Title } from '@vkontakte/vkui';
+import { Avatar, Button, Caption, Div, Group, Header, Panel, PanelHeader, Text, Title } from '@vkontakte/vkui';
 import { Icon28AddOutline, Icon28Users3Outline } from '@vkontakte/icons';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { Goal, NavIdProps } from '../types';
-import { formatToday, isDone, toDateKey } from '../utils/goals';
+import { formatToday, isDone, plural, toDateKey } from '../utils/goals';
 import { GoalCard } from '../components/GoalCard';
 
 interface HomeProps extends NavIdProps {
   fetchedUser?: UserInfo;
   goals: Goal[];
+  serverError?: string;
   onOpenGoal: (id: string) => void;
   onCreateGoal: () => void;
   onMark: (id: string, status: 'done' | 'skipped') => void;
   onAddValue: (id: string, value: number) => void;
 }
 
-export const Home = ({ id, fetchedUser, goals, onOpenGoal, onCreateGoal, onMark, onAddValue }: HomeProps) => {
+export const Home = ({ id, fetchedUser, goals, serverError, onOpenGoal, onCreateGoal, onMark, onAddValue }: HomeProps) => {
   const routeNavigator = useRouteNavigator();
   const completed = goals.filter((goal) => isDone(goal.entries[toDateKey()])).length;
   const progress = goals.length ? Math.round((completed / goals.length) * 100) : 0;
@@ -39,22 +40,27 @@ export const Home = ({ id, fetchedUser, goals, onOpenGoal, onCreateGoal, onMark,
           <div className="daily-summary__content">
             <Caption className="daily-summary__eyebrow">Ваш фокус на сегодня</Caption>
             <Title level="2" weight="2" className="daily-summary__title">
-              {goals.length === 0 ? 'Начните с первой цели' : allDone ? 'Всё выполнено!' : `${completed} из ${goals.length} целей`}
+              {goals.length === 0 ? 'Начните с первой цели' : allDone ? 'Всё выполнено!' : `${completed} из ${goals.length} ${plural(goals.length, ['цели', 'целей', 'целей'])}`}
             </Title>
             <Text className="daily-summary__text">
               {goals.length === 0 ? 'Определите небольшой шаг, который хотите сделать.' : allDone ? 'Отличная работа. Можно выдохнуть.' : 'Отметьте прогресс — без давления и обязательств.'}
             </Text>
-            <Progress value={progress} className="daily-summary__progress" aria-label="Дневной прогресс" />
           </div>
-          <div className="progress-ring" style={{ '--progress': `${progress * 3.6}deg` } as CSSProperties}>
+          <div className="progress-ring" role="img" aria-label={`Дневной прогресс: ${progress}%`} style={{ '--progress': `${progress * 3.6}deg` } as CSSProperties}>
             <span>{progress}%</span>
           </div>
         </div>
       </Div>
 
-      <Div className="create-goal-action">
-        <Button stretched size="l" before={<Icon28AddOutline />} onClick={onCreateGoal}>Добавить цель</Button>
-        <Button stretched size="m" mode="tertiary" onClick={() => routeNavigator.push('/catalog')}>Выбрать из шаблонов</Button>
+      {serverError && (
+        <Div>
+          <div className="server-banner" role="alert">Общие цели сейчас недоступны: {serverError}</div>
+        </Div>
+      )}
+
+      <Div className="top-actions">
+        <Button stretched size="m" before={<Icon28AddOutline width={20} height={20} />} onClick={onCreateGoal}>Новая цель</Button>
+        <Button stretched size="m" mode="secondary" onClick={() => routeNavigator.push('/catalog')}>Из шаблона</Button>
       </Div>
 
       <Group mode="plain" header={<Header size="s">Что отметить сегодня</Header>}>
